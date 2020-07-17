@@ -1,0 +1,13 @@
+Solid tiles
+Destructible tiles
+Move in 4 directions
+Grid of 8x8 per map
+26*26 pixel size grid. Total = 208*208 pixels. 
+Leaves space on the screen to show stats, buttons, etc.
+Action points and move points
+Health value
+Ammo value - need to reload takes one turn
+Line on block/character to indicate facing direction?
+Font to show characters/animations etc. Quicker to render.
+Could use bitmaps from the SD card too
+Shoot action
