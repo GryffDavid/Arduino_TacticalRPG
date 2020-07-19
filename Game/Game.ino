@@ -41,7 +41,19 @@ uint8_t Orientation = 1;
 #define MAGENTA 0xF81F
 #define YELLOW  0xFFE0
 #define WHITE   0xFFFF
-#define GREY 4359
+
+/* some RGB color definitions                                                 */
+#define Navy            0x000F      /*   0,   0, 128 */
+#define DarkGreen       0x03E0      /*   0, 128,   0 */
+#define DarkCyan        0x03EF      /*   0, 128, 128 */
+#define Maroon          0x7800      /* 128,   0,   0 */
+#define Purple          0x780F      /* 128,   0, 128 */
+#define Olive           0x7BE0      /* 128, 128,   0 */
+#define LightGrey       0xC618      /* 192, 192, 192 */
+#define DarkGrey        0x7BEF      /* 128, 128, 128 */
+#define Orange          0xFD20      /* 255, 165,   0 */
+#define GreenYellow     0xAFE5      /* 173, 255,  47 */
+#define Pink            0xF81F
 
 
 class cBtn
@@ -66,39 +78,42 @@ class Player
 {
   public:
 	  //Position
-	  int x, y;
-	  int prevX, prevY;
+	  uint16_t x, prevX;
+	  byte y, prevY;
   
 	  //Stats
-	  int STR, DEX, CON, INT, WIS, CHA;
+	  byte STR, DEX, CON, INT, WIS, CHA;
 
-	  int money;
+	  uint16_t money;
 
-	  int MaxHP, CurHP;
+	  byte MaxHP, CurHP;
 
-	  int Level;
+	  byte Level;
 };
 
 //Enemy for the player to fight
 class Enemy
 {
 	public:
-		int x, y;
-		int STR, DEX;
+		uint8_t x;
+    byte y;
+		byte STR, DEX;
 };
 
 //Non-enemy character for the player to interact with. e.g. Shopkeeper, quest giver etc.
 class NPC
 {
 	public:
-		int x, y;
+		uint8_t x;
+    byte y;
 };
 
 //Items for the player to pick up
 class Item
 {
 	public:
-		int x, y;
+		uint8_t x;
+    byte y;
 };
 
 class Tile
@@ -110,7 +125,6 @@ class Tile
     uint16_t color; //The colour this tile should be when drawn on screen
 };
 
-char screen [15][26];
 Tile tScreen [15][26];
 
 Player player;
@@ -118,11 +132,12 @@ Player player;
 enum GameState { World, CharacterScreen, Combat };
 GameState CurrentGameState;
 
+uint16_t tmp;
+
 
 void setup(void)
 {
     CurrentGameState = World;
-    uint16_t tmp;
     tft.begin(9600);    
     Serial.begin(9600);
     tft.reset();
@@ -167,71 +182,78 @@ void setup(void)
     player.x = 5;
     player.y = 5;
 
-    String str1 =  "bbbbbbbbbbbbbbbbbbbbbbbbb";
-    String str2 =  "bddddddddddbddddddddddddb";
-    String str3 =  "bddddddddddbddddddddddddb";
-    String str4 =  "bddddddddddbddddddddddddb";
-    String str5 =  "bddddddcdddbddddcdddddddb";
-    String str6 =  "bddddddddddbddddddddddddb";
-    String str7 =  "bddddddddddddcddddddddddb";
-    String str8 =  "bdddddddcdddddddddddddddb";
-    String str9 =  "bdddddddcdddddddddddddddb";
-    String str10 = "bdddddddddddddddddddddddb";
-    String str11 = "bdddddddddddddddddddddddb";
-    String str12 = "bddddddddeddddddddddddddb";        
-    String str13 = "bdddddddddddddddddddddddb";
-    String str14 = "bdddddddddddddddddddddddb";
-    String str15 = "bbbbbbbbbbbbbbbbbbbbbbbbb";
-    
-    str1.toCharArray(screen[0], 26);
-    str2.toCharArray(screen[1], 26);
-    str3.toCharArray(screen[2], 26);
-    str4.toCharArray(screen[3], 26);
-    str5.toCharArray(screen[4], 26);
-    str6.toCharArray(screen[5], 26);
-    str7.toCharArray(screen[6], 26);
-    str8.toCharArray(screen[7], 26);
-    str9.toCharArray(screen[8], 26);
-    str10.toCharArray(screen[9], 26);
-    str11.toCharArray(screen[10], 26);
-    str12.toCharArray(screen[11], 26);    
-    str13.toCharArray(screen[12], 26);
-    str14.toCharArray(screen[13], 26);
-    str15.toCharArray(screen[14], 26);
-    
-    String foo = "";
-
-    screen[5][5] = 'c';
+    String str1 =  
+    "bbbbbbbbbbbbggggggggggggg"
+    "bffffffffffbggggggggggggg"
+    "bddddddddddbgggggggggcggg"
+    "bddddddddddbgggcggggggggg"
+    "bddddddddddbgggcggggggggg"
+    "bddddddddddbcggggggggcggg"
+    "bddddddddddbggggggggggggg"
+    "bddddddddddbbbbbbbgbbbbbb"
+    "bbbbdbbbdddfffffffdfffffb"
+    "bfffdffbddddddddddddddddb"
+    "bddddddbddddddddddddddddb"
+    "bddddddbdedddddhdhddddddb"
+    "bddddddbdddddhddddddddddb"
+    "bddddddbddddddddddddddddb"
+    "bbbbbbbbbbbbbbbbbbbbbbbbb";
     
     for (int y = 0; y < 15; y++)
     {
       for (int x = 0; x < 26; x++)
       { 
-        foo.concat(screen[y][x]);
+        //foo.concat(screen[y][x]);
         Tile newTile;
         newTile.x = x;
         newTile.y = y;
-        newTile.style = screen[y][x];
+        newTile.style = str1[(26*y)+x];
+
+        switch (newTile.style)
+        {
+            default:
+              newTile.color = GREEN;
+            break;
+          
+            case 'b':
+            case 'f':
+              newTile.color = YELLOW;
+              break;
+            
+            case 'd':
+              newTile.color = BLUE;
+              break;
+              
+            case 'e':
+              newTile.color = WHITE;
+              break;
+
+            case 'g':
+              newTile.color = DarkGreen;
+              break;
+
+            case 'h':
+              newTile.color = GetColor(150, 150, 150);
+              break;
+        }
         
-        if (newTile.style == 'b')
-            newTile.color = GetColor(100, 100, 100);
-        else if (newTile.style == 'e')
-            newTile.color = WHITE;
-          else
-            newTile.color = GREEN;
+//        if (newTile.style == 'b' || newTile.style == 'f')
+//            newTile.color = YELLOW;
+//        else if (newTile.style == 'd')
+//            newTile.color = BLUE;
+//        else if (newTile.style == 'e')
+//            newTile.color = WHITE;
+//        else if (newTile.style == 'g')
+//            newTile.color = DarkGreen;
+//          else
+//            newTile.color = GREEN;
         
         tScreen[y][x] = newTile;
+
+        tft.setTextColor(newTile.color);
+        tft.print(newTile.style);
       }
     }
-
-  for (int y = 0; y < 15; y++)
-  {
-    for (int x = 0; x < 26; x++)
-    {
-      tft.setTextColor(tScreen[y][x].color);
-      tft.print(tScreen[y][x].style);
-    }
-  }
 
 	//tft.print(foo);
 
@@ -263,7 +285,7 @@ void loop()
               player.prevY = player.y;
 
               //TODO: Should check to see if the player can/has moved before drawing things.              
-              if (screen[player.y-1][player.x] != 'b')
+              if (tScreen[player.y-1][player.x].style != 'b')
               {
                 //Move the player
                 player.y -= 1;
@@ -278,35 +300,35 @@ void loop()
                 //Redraw the tile where the player was standing (e.g. Grass), so that there isn't a black space left
                 tft.setTextColor(tScreen[player.prevY][player.prevX].color);        
                 tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
-                tft.print(screen[player.prevY][player.prevX]);
+                tft.print(tScreen[player.prevY][player.prevX].style);
               }
           }
         
         
-          if (UpdateTFTBtn(UpButton) == true)
-          {
-              player.prevX = player.x;
-              player.prevY = player.y;
-
-              //TODO: Should check to see if the player can/has moved before drawing things.              
-              if (screen[player.y+1][player.x] != 'b')
-              {
-                //Move the player
-                player.y += 1;
-        
-                //Draw a black square over where the player WAS
-                tft.fillRect(player.prevX * 16, player.prevY * 16, 16, 16, BLACK);
-                tft.setTextColor(RED);
-                //Draw the player sprite at the new location
-                tft.setCursor(player.x * 16, player.y * 16 + 16);
-                tft.print('a');
-        
-                //Redraw the tile where the player was standing (e.g. Grass), so that there isn't a black space left
-                tft.setTextColor(tScreen[player.prevY][player.prevX].color);  
-                tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
-                tft.print(screen[player.prevY][player.prevX]);
-              }
-          }
+//          if (UpdateTFTBtn(UpButton) == true)
+//          {
+//              player.prevX = player.x;
+//              player.prevY = player.y;
+//
+//              //TODO: Should check to see if the player can/has moved before drawing things.              
+//              if (screen[player.y+1][player.x] != 'b')
+//              {
+//                //Move the player
+//                player.y += 1;
+//        
+//                //Draw a black square over where the player WAS
+//                tft.fillRect(player.prevX * 16, player.prevY * 16, 16, 16, BLACK);
+//                tft.setTextColor(RED);
+//                //Draw the player sprite at the new location
+//                tft.setCursor(player.x * 16, player.y * 16 + 16);
+//                tft.print('a');
+//        
+//                //Redraw the tile where the player was standing (e.g. Grass), so that there isn't a black space left
+//                tft.setTextColor(tScreen[player.prevY][player.prevX].color);  
+//                tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
+//                tft.print(screen[player.prevY][player.prevX]);
+//              }
+//          }
           break;
     }
 
