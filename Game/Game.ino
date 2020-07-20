@@ -185,18 +185,18 @@ void setup(void)
     String str1 =  
     "bbbbbbbbbbbbggggggggggggg"
     "bffffffffffbggggggggggggg"
-    "bddddddddddbgggggggggcggg"
-    "bddddddddddbgggcggggggggg"
-    "bddddddddddbgggcggggggggg"
-    "bddddddddddbcggggggggcggg"
-    "bddddddddddbggggggggggggg"
-    "bddddddddddbbbbbbbgbbbbbb"
-    "bbbbdbbbdddfffffffdfffffb"
-    "bfffdffbddddddddddddddddb"
-    "bddddddbddddddddddddddddb"
-    "bddddddbdedddddhdhddddddb"
-    "bddddddbdddddhddddddddddb"
-    "bddddddbddddddddddddddddb"
+    "b          bgggggggggcggg"
+    "b          bgggcggggggggg"
+    "b          bgggcggggggggg"
+    "b          bcggggggggcggg"
+    "b          bggggggggggggg"
+    "b          bbbbbbbgbbbbbb"
+    "b          fffffffdfffffb"
+    "bfff ffb                b"
+    "b      b                b"
+    "b      b e              b"
+    "b      b                b"
+    "b      b                b"
     "bbbbbbbbbbbbbbbbbbbbbbbbb";
     
     for (int y = 0; y < 15; y++)
@@ -207,7 +207,11 @@ void setup(void)
         Tile newTile;
         newTile.x = x;
         newTile.y = y;
-        newTile.style = str1[(26*y)+x];
+
+        if (str1[(26*y)+x] == ' ')
+          newTile.style = 'd';
+        else 
+          newTile.style = str1[(26*y)+x];
 
         switch (newTile.style)
         {
@@ -410,6 +414,13 @@ bool UpdatePhysicalBtn(cBtn &button)
 uint16_t GetColor(uint8_t r, uint8_t g, uint8_t b) 
 {
     return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+}
+
+//This function will need to redraw the game screen again after the player has opened a menu and then returned to the game
+//or has transitioned out of combat back to the main game
+void RedrawGame()
+{
+  
 }
 
 
