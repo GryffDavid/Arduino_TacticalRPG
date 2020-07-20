@@ -70,6 +70,9 @@ public:
 
 //Physical buttons
 cBtn topBtn(28);
+cBtn leftBtn(26);
+cBtn rightBtn(30);
+cBtn downBtn(32);
 
 TFTButton UpButton;
 
@@ -126,6 +129,9 @@ class Tile
 };
 
 Tile tScreen [15][26];
+Enemy enemies[10];
+Item items[10];
+NPC npcs[10];
 
 Player player;
 
@@ -143,7 +149,13 @@ void setup(void)
     tft.reset();
     identifier = tft.readID();
 
+    pinMode(53, OUTPUT);
+    digitalWrite(53, HIGH);
+
     pinMode(topBtn.buttonPin, INPUT);
+    pinMode(leftBtn.buttonPin, INPUT);
+    pinMode(rightBtn.buttonPin, INPUT);
+    pinMode(downBtn.buttonPin, INPUT);
     
      switch (Orientation) 
     {
@@ -182,36 +194,35 @@ void setup(void)
     player.x = 5;
     player.y = 5;
 
+    player.prevX = 5;
+    player.prevY = 5;
+
     String str1 =  
     "bbbbbbbbbbbbggggggggggggg"
     "bffffffffffbggggggggggggg"
-    "b          bgggggggggcggg"
-    "b          bgggcggggggggg"
-    "b          bgggcggggggggg"
-    "b          bcggggggggcggg"
-    "b          bggggggggggggg"
-    "b          bbbbbbbgbbbbbb"
-    "b          fffffffdfffffb"
-    "bfff ffb                b"
-    "b      b                b"
-    "b      b e              b"
-    "b      b                b"
-    "b      b                b"
+    "bddddddddddbgggggggggcggg"
+    "bddddddddddbgggcggggggggg"
+    "bddddddddddbgggcgggggggcc"
+    "bddddddddddbcggggggggcccc"
+    "bddddddddddbgggggggggcccc"
+    "bddddddddddbbbbbbbgbbbbbb"
+    "bbbbdbbbdddfffffffdfffffb"
+    "bfffdffbddddddddddddddddb"
+    "bddddddbddddddhdddddddddb"
+    "bddddddbdedddddiddddddddb"
+    "bddddddbddddhddhddddddddb"
+    "bddddddbddddddddddddddddb"
     "bbbbbbbbbbbbbbbbbbbbbbbbb";
     
     for (int y = 0; y < 15; y++)
     {
-      for (int x = 0; x < 26; x++)
-      { 
-        //foo.concat(screen[y][x]);
+      for (int x = 0; x < 25; x++)
+      {
         Tile newTile;
         newTile.x = x;
         newTile.y = y;
 
-        if (str1[(26*y)+x] == ' ')
-          newTile.style = 'd';
-        else 
-          newTile.style = str1[(26*y)+x];
+        newTile.style = str1[(25*y)+x];
 
         switch (newTile.style)
         {
@@ -225,7 +236,7 @@ void setup(void)
               break;
             
             case 'd':
-              newTile.color = BLUE;
+              newTile.color = Pink;
               break;
               
             case 'e':
@@ -241,17 +252,6 @@ void setup(void)
               break;
         }
         
-//        if (newTile.style == 'b' || newTile.style == 'f')
-//            newTile.color = YELLOW;
-//        else if (newTile.style == 'd')
-//            newTile.color = BLUE;
-//        else if (newTile.style == 'e')
-//            newTile.color = WHITE;
-//        else if (newTile.style == 'g')
-//            newTile.color = DarkGreen;
-//          else
-//            newTile.color = GREEN;
-        
         tScreen[y][x] = newTile;
 
         tft.setTextColor(newTile.color);
@@ -259,12 +259,12 @@ void setup(void)
       }
     }
 
-	//tft.print(foo);
-
-	tft.setCursor(player.x * 16, player.y * 16 + 16);
-	tft.print('a');
+  	tft.setCursor(player.x * 16, player.y * 16 + 16);
+  	tft.print('a');
 
     UpButton.InitButton(&tft, 0, 0, 64, 64, WHITE, BLACK, BLACK, "");
+
+    tft.fillRect(240, 0, 160, 240, BLACK);
     
     delay(1000);
 }
@@ -282,58 +282,100 @@ void loop()
     switch (CurrentGameState)
     {
         case World:
-
+        {
+          //MOVE UP
           if (UpdatePhysicalBtn(topBtn) == true)
           {
-              player.prevX = player.x;
-              player.prevY = player.y;
-
-              //TODO: Should check to see if the player can/has moved before drawing things.              
               if (tScreen[player.y-1][player.x].style != 'b')
               {
-                //Move the player
+                player.prevX = player.x;
+                player.prevY = player.y;
+                
                 player.y -= 1;
         
-                //Draw a black square over where the player WAS
                 tft.fillRect(player.prevX * 16, player.prevY * 16, 16, 16, BLACK);
+                
                 tft.setTextColor(RED);
-                //Draw the player sprite at the new location
                 tft.setCursor(player.x * 16, player.y * 16 + 16);
                 tft.print('a');
         
-                //Redraw the tile where the player was standing (e.g. Grass), so that there isn't a black space left
+                tft.setTextColor(tScreen[player.prevY][player.prevX].color);        
+                tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
+                tft.print(tScreen[player.prevY][player.prevX].style);
+              }
+          }
+
+          //MOVE DOWN
+          if (UpdatePhysicalBtn(downBtn) == true)
+          {              
+              if (tScreen[player.y+1][player.x].style != 'b')
+              {
+                player.prevX = player.x;
+                player.prevY = player.y;
+                                
+                player.y += 1;
+        
+                tft.fillRect(player.prevX * 16, player.prevY * 16, 16, 16, BLACK);
+                
+                tft.setTextColor(RED);
+                tft.setCursor(player.x * 16, player.y * 16 + 16);
+                tft.print('a');
+        
+                tft.setTextColor(tScreen[player.prevY][player.prevX].color);        
+                tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
+                tft.print(tScreen[player.prevY][player.prevX].style);
+              }
+          }
+
+          //MOVE LEFT
+          if (UpdatePhysicalBtn(leftBtn) == true)
+          {            
+              if (tScreen[player.y][player.x-1].style != 'b')
+              {
+                player.prevX = player.x;
+                player.prevY = player.y;
+                
+                player.x -= 1;
+        
+                tft.fillRect(player.prevX * 16, player.prevY * 16, 16, 16, BLACK);
+                
+                tft.setTextColor(RED);                
+                tft.setCursor(player.x * 16, player.y * 16 + 16);
+                tft.print('a');
+        
+                tft.setTextColor(tScreen[player.prevY][player.prevX].color);        
+                tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
+                tft.print(tScreen[player.prevY][player.prevX].style);
+              }
+          }
+
+          //MOVE RIGHT
+          if (UpdatePhysicalBtn(rightBtn) == true)
+          {
+              if (tScreen[player.y][player.x+1].style != 'b')
+              {
+                player.prevX = player.x;
+                player.prevY = player.y;
+                
+                player.x += 1;
+        
+                tft.fillRect(player.prevX * 16, player.prevY * 16, 16, 16, BLACK);
+                
+                tft.setTextColor(RED);
+                tft.setCursor(player.x * 16, player.y * 16 + 16);
+                tft.print('a');
+        
                 tft.setTextColor(tScreen[player.prevY][player.prevX].color);        
                 tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
                 tft.print(tScreen[player.prevY][player.prevX].style);
               }
           }
         
-        
 //          if (UpdateTFTBtn(UpButton) == true)
 //          {
-//              player.prevX = player.x;
-//              player.prevY = player.y;
-//
-//              //TODO: Should check to see if the player can/has moved before drawing things.              
-//              if (screen[player.y+1][player.x] != 'b')
-//              {
-//                //Move the player
-//                player.y += 1;
-//        
-//                //Draw a black square over where the player WAS
-//                tft.fillRect(player.prevX * 16, player.prevY * 16, 16, 16, BLACK);
-//                tft.setTextColor(RED);
-//                //Draw the player sprite at the new location
-//                tft.setCursor(player.x * 16, player.y * 16 + 16);
-//                tft.print('a');
-//        
-//                //Redraw the tile where the player was standing (e.g. Grass), so that there isn't a black space left
-//                tft.setTextColor(tScreen[player.prevY][player.prevX].color);  
-//                tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
-//                tft.print(screen[player.prevY][player.prevX]);
-//              }
 //          }
-          break;
+        }
+        break;
     }
 
 	//Player touched the screen
