@@ -2,6 +2,9 @@
 #include <TFTScreen.h>
 #include <TouchScreen.h>
 #include <Fonts/Anims1.h>
+#include <Fonts/FreeMono9pt7b.h>
+#include <SPI.h>
+#include <SD.h>
 
 TFTScreen tft;
 
@@ -128,7 +131,15 @@ class Tile
     uint16_t color; //The colour this tile should be when drawn on screen
 };
 
-Tile tScreen [15][26];
+//LOAD THE FULL MAP INTO THIS ARRAY OF CHAR
+char screen[15][150];
+String sScreen;
+
+//THIS JUST STORES THE DATA DRAWN ON SCREEN - WHEN TRANSITIONING TO A NEW SCREEN, JUST LOAD FROM THE CHAR ARRAY
+#define xLength 16
+
+Tile tScreen [15][xLength];
+
 Enemy enemies[10];
 Item items[10];
 NPC npcs[10];
@@ -141,23 +152,15 @@ GameState CurrentGameState;
 uint16_t tmp;
 
 
+File myFile;
+#define SD_CS 5
+
 void setup(void)
 {
-    CurrentGameState = World;
-    tft.begin(9600);    
     Serial.begin(9600);
-    tft.reset();
     identifier = tft.readID();
-
-    pinMode(53, OUTPUT);
-    digitalWrite(53, HIGH);
-
-    pinMode(topBtn.buttonPin, INPUT);
-    pinMode(leftBtn.buttonPin, INPUT);
-    pinMode(rightBtn.buttonPin, INPUT);
-    pinMode(downBtn.buttonPin, INPUT);
-    
-     switch (Orientation) 
+    tft.begin(identifier);    
+    switch (Orientation) 
     {
         case 0:  
         break;
@@ -185,9 +188,67 @@ void setup(void)
     }
 
     ts = TouchScreen(XP, YP, XM, YM, 300);     //call the constructor AGAIN with new values.
-    tft.begin(identifier);
     tft.setRotation(Orientation);
-    tft.fillScreen(BLACK);    
+    tft.fillScreen(BLACK);  
+
+    bool good = SD.begin(SD_CS);
+
+    if (!good)
+    {
+        tft.println("SD failed to initialise");
+        Serial.println("SD failed to initialise");
+        while(1);
+    }
+    else
+    {
+        tft.println("SD Initialised");
+    }
+
+    tft.println("Loading...");
+
+    myFile = SD.open("Level.txt");
+    if (myFile) 
+    {
+        Serial.println("Level.txt:");
+
+        if (myFile.available())
+        for (int i = 0; i < 5; i++)
+        {
+          sScreen = myFile.readString();
+          tft.print(".");
+        }
+//        while(myFile.available()) 
+//        {          
+//          sScreen = myFile.readString();         
+//          tft.print(".");
+//        }
+
+        Serial.print(sScreen);
+        
+        myFile.close();
+    } 
+    else 
+    {      
+      Serial.println("error opening Level.txt");
+    }
+
+    tft.println("LOADED!");
+    delay(1000);
+
+    tft.fillScreen(BLACK);
+
+    CurrentGameState = World;
+
+    pinMode(53, OUTPUT);
+    digitalWrite(53, HIGH);
+
+    pinMode(topBtn.buttonPin, INPUT);
+    pinMode(leftBtn.buttonPin, INPUT);
+    pinMode(rightBtn.buttonPin, INPUT);
+    pinMode(downBtn.buttonPin, INPUT);
+    
+  
+    
     tft.setCursor(0, 10);
     tft.setFont(&Anims1);
 
@@ -197,32 +258,35 @@ void setup(void)
     player.prevX = 5;
     player.prevY = 5;
 
-    String str1 =  
-    "bbbbbbbbbbbbggggggggggggg"
-    "bffffffffffbggggggggggggg"
-    "bddddddddddbgggggggggcggg"
-    "bddddddddddbgggcggggggggg"
-    "bddddddddddbgggcgggggggcc"
-    "bddddddddddbcggggggggcccc"
-    "bddddddddddbgggggggggcccc"
-    "bddddddddddbbbbbbbgbbbbbb"
-    "bbbbdbbbdddfffffffdfffffb"
-    "bfffdffbddddddddddddddddb"
-    "bddddddbddddddhdddddddddb"
-    "bddddddbdedddddiddddddddb"
-    "bddddddbddddhddhddddddddb"
-    "bddddddbddddddddddddddddb"
-    "bbbbbbbbbbbbbbbbbbbbbbbbb";
-    
+    String str1 = sScreen;
+//
+//    Serial.print("/n");
+//    Serial.println(
+//    "bbbbbbbbbbbbgg"
+//    "bffffffffffbgg"
+//    "bddddddddddbgg"
+//    "bddddddddddbgg"
+//    "bddddddddddbgg"
+//    "bddddddddddbcg"
+//    "bddddddddddbgg"
+//    "bddddddddddbbb"
+//    "bbbbdbbbdddfff"
+//    "bfffdffbdddddd"
+//    "bddddddbdddddd"
+//    "bddddddbdedddd"
+//    "bddddddbddddhd"
+//    "bddddddbdddddd"
+//    "bbbbbbbbbbbbbb");
+  
     for (int y = 0; y < 15; y++)
     {
-      for (int x = 0; x < 25; x++)
+      for (int x = 0; x < xLength; x++)
       {
         Tile newTile;
         newTile.x = x;
         newTile.y = y;
 
-        newTile.style = str1[(25*y)+x];
+        newTile.style = str1[(xLength*y)+x];
 
         switch (newTile.style)
         {
@@ -255,7 +319,7 @@ void setup(void)
         tScreen[y][x] = newTile;
 
         tft.setTextColor(newTile.color);
-        tft.print(newTile.style);
+        tft.print(newTile.style);        
       }
     }
 
