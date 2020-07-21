@@ -150,6 +150,7 @@ enum GameState { World, CharacterScreen, Combat };
 GameState CurrentGameState;
 
 uint16_t tmp;
+long randNumber;
 
 
 File myFile;
@@ -158,6 +159,13 @@ File myFile;
 void setup(void)
 {
     Serial.begin(9600);
+    randomSeed(analogRead(6));
+
+    for (int i = 0; i < 10; i++)
+    {
+        Serial.print(random(0, 600));
+    }
+    
     identifier = tft.readID();
     tft.begin(identifier);    
     switch (Orientation) 
@@ -209,22 +217,36 @@ void setup(void)
     myFile = SD.open("Level.txt");
     if (myFile) 
     {
+        
         Serial.println("Level.txt:");
-        char buf[15];
+        char buf[16];
+        
         uint16_t pos = 0;
-        myFile.seek(pos);
+        uint16_t startx = 15;
+        uint16_t starty = 15;
+        
+//        while(myFile.available())
+//        {
+//            Serial.write(myFile.read());
+//        }
+
         if (myFile.available()) 
         {
-          sScreen = myFile.readString();  
-
-          pos = 75;
-          myFile.seek(pos+(pos/15));
-          myFile.readBytes(buf, 15);
-          
-          tft.print(".");
+          //sScreen = myFile.readString();
+          for (int y = starty; y < starty+15; y++)
+          {
+            pos = ((151*y+y)) + startx;
+            //Serial.print("Start Index: "); Serial.println(pos);
+            //Serial.print("End Index: "); Serial.println(pos + 15);
+            myFile.seek(pos);        
+            myFile.readBytes(buf, 15);
+            //Serial.println(buf);
+            sScreen += buf;
+            //tft.print(".");
+          }
         }
-        Serial.println(buf);
-        Serial.println(sScreen);
+        sScreen.replace('', '\n');
+        //Serial.print(sScreen);
         
         myFile.close();
     } 
