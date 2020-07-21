@@ -209,37 +209,22 @@ void setup(void)
     myFile = SD.open("Level.txt");
     if (myFile) 
     {
-        
         Serial.println("Level.txt:");
         char buf[15];
-        
         uint16_t pos = 0;
-        uint16_t startx = 0;
-        uint16_t starty = 0;
-        
-//        while(myFile.available())
-//        {
-//            Serial.write(myFile.read());
-//        }
-
+        myFile.seek(pos);
         if (myFile.available()) 
         {
-          //sScreen = myFile.readString();
-          for (int y = 0; y < 15; y++)
-          {
-            pos = (starty+(151*y+y));
-            Serial.print("Start Index: "); Serial.println(pos);
-            Serial.print("End Index: "); Serial.println(pos + 15);
-            myFile.seek(pos);        
-            myFile.readBytes(buf, 15);
-            Serial.println(buf);
-            sScreen += buf;
-            tft.print(".");
-          }
-        }
-        
+          sScreen = myFile.readString();  
 
-        Serial.print(sScreen);
+          pos = 75;
+          myFile.seek(pos+(pos/15));
+          myFile.readBytes(buf, 15);
+          
+          tft.print(".");
+        }
+        Serial.println(buf);
+        Serial.println(sScreen);
         
         myFile.close();
     } 
