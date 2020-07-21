@@ -150,22 +150,112 @@ enum GameState { World, CharacterScreen, Combat };
 GameState CurrentGameState;
 
 uint16_t tmp;
-long randNumber;
 
+uint16_t xChunk = 0;
+uint16_t yChunk = 0;
 
 File myFile;
 #define SD_CS 5
 
+void LoadChunk(uint16_t xStart, uint16_t yStart)
+{
+    xStart *= 15;
+    yStart *= 15;
+    
+    sScreen = "";
+        
+    myFile = SD.open("Level.txt");
+    if (myFile) 
+    {        
+        uint16_t startx = xStart;
+        uint16_t starty = yStart;
+        
+        if (myFile.available()) 
+        {
+          for (int y = starty; y < starty+15; y++)
+          {
+            char buf[16];
+            uint16_t pos = ((151*y+y)) + startx;
+            //Serial.print("Start Index: "); Serial.println(pos);
+            //Serial.print("End Index: "); Serial.println(pos + 15);
+            myFile.seek(pos);        
+            myFile.readBytes(buf, 15);
+            //Serial.println(buf);
+            sScreen += buf;
+            //tft.print(".");
+          }
+        }
+        sScreen.replace('', '\n');
+//        Serial.print("Chunk Loaded");
+//        Serial.print(sScreen);
+        
+        myFile.close();
+    } 
+    else 
+    {      
+      Serial.println("error opening Level.txt");
+    }
+    
+    
+    //tft.println("LOADED!");
+    tft.fillScreen(BLACK);
+}
+
+void DrawScreen()
+{
+    tft.setCursor(0, 16);
+    tft.setFont(&Anims1);
+    String str1 = sScreen;
+  
+    for (int y = 0; y < 15; y++)
+    {
+      for (int x = 0; x < xLength; x++)
+      {
+        Tile newTile;
+        newTile.x = x;
+        newTile.y = y;
+
+        newTile.style = str1[(xLength*y)+x];
+
+        switch (newTile.style)
+        {
+            default:
+              newTile.color = GREEN;
+            break;
+          
+            case 'b':
+            case 'f':
+              newTile.color = YELLOW;
+              break;
+            
+            case 'd':
+              newTile.color = Pink;
+              break;
+              
+            case 'e':
+              newTile.color = WHITE;
+              break;
+
+            case 'g':
+              newTile.color = DarkGreen;
+              break;
+
+            case 'h':
+              newTile.color = GetColor(150, 150, 150);
+              break;
+        }
+        
+        tScreen[y][x] = newTile;
+
+        tft.setTextColor(newTile.color);
+        tft.print(newTile.style);        
+      }
+    }
+}
+
 void setup(void)
 {
     Serial.begin(9600);
-    randomSeed(analogRead(6));
-
-    for (int i = 0; i < 10; i++)
-    {
-        Serial.print(random(0, 600));
-    }
-    
     identifier = tft.readID();
     tft.begin(identifier);    
     switch (Orientation) 
@@ -214,52 +304,9 @@ void setup(void)
 
     tft.println("Loading...");
 
-    myFile = SD.open("Level.txt");
-    if (myFile) 
-    {
-        
-        Serial.println("Level.txt:");
-        char buf[16];
-        
-        uint16_t pos = 0;
-        uint16_t startx = 15;
-        uint16_t starty = 15;
-        
-//        while(myFile.available())
-//        {
-//            Serial.write(myFile.read());
-//        }
-
-        if (myFile.available()) 
-        {
-          //sScreen = myFile.readString();
-          for (int y = starty; y < starty+15; y++)
-          {
-            pos = ((151*y+y)) + startx;
-            //Serial.print("Start Index: "); Serial.println(pos);
-            //Serial.print("End Index: "); Serial.println(pos + 15);
-            myFile.seek(pos);        
-            myFile.readBytes(buf, 15);
-            //Serial.println(buf);
-            sScreen += buf;
-            //tft.print(".");
-          }
-        }
-        sScreen.replace('', '\n');
-        //Serial.print(sScreen);
-        
-        myFile.close();
-    } 
-    else 
-    {      
-      Serial.println("error opening Level.txt");
-    }
-
-    tft.println("LOADED!");
-    delay(1000);
-
-    tft.fillScreen(BLACK);
-
+    LoadChunk(xChunk, yChunk);
+    DrawScreen();
+    
     CurrentGameState = World;
 
     pinMode(53, OUTPUT);
@@ -270,81 +317,13 @@ void setup(void)
     pinMode(rightBtn.buttonPin, INPUT);
     pinMode(downBtn.buttonPin, INPUT);
     
-  
-    
-    tft.setCursor(0, 10);
-    tft.setFont(&Anims1);
-
     player.x = 5;
     player.y = 5;
 
     player.prevX = 5;
     player.prevY = 5;
 
-    String str1 = sScreen;
-
-//    Serial.print("/n");
-//    Serial.println(
-//    "bbbbbbbbbbbbgg"
-//    "bffffffffffbgg"
-//    "bddddddddddbgg"
-//    "bddddddddddbgg"
-//    "bddddddddddbgg"
-//    "bddddddddddbcg"
-//    "bddddddddddbgg"
-//    "bddddddddddbbb"
-//    "bbbbdbbbdddfff"
-//    "bfffdffbdddddd"
-//    "bddddddbdddddd"
-//    "bddddddbdedddd"
-//    "bddddddbddddhd"
-//    "bddddddbdddddd"
-//    "bbbbbbbbbbbbbb");
-  
-    for (int y = 0; y < 15; y++)
-    {
-      for (int x = 0; x < xLength; x++)
-      {
-        Tile newTile;
-        newTile.x = x;
-        newTile.y = y;
-
-        newTile.style = str1[(xLength*y)+x];
-
-        switch (newTile.style)
-        {
-            default:
-              newTile.color = GREEN;
-            break;
-          
-            case 'b':
-            case 'f':
-              newTile.color = YELLOW;
-              break;
-            
-            case 'd':
-              newTile.color = Pink;
-              break;
-              
-            case 'e':
-              newTile.color = WHITE;
-              break;
-
-            case 'g':
-              newTile.color = DarkGreen;
-              break;
-
-            case 'h':
-              newTile.color = GetColor(150, 150, 150);
-              break;
-        }
-        
-        tScreen[y][x] = newTile;
-
-        tft.setTextColor(newTile.color);
-        tft.print(newTile.style);        
-      }
-    }
+    
 
   	tft.setCursor(player.x * 16, player.y * 16 + 16);
   	tft.print('a');
@@ -372,7 +351,15 @@ void loop()
         {
           //MOVE UP
           if (UpdatePhysicalBtn(topBtn) == true)
-          {
+          {            
+              if (player.y == 0)
+              {
+                  player.y = 14;
+                  yChunk -= 1;
+                  LoadChunk(xChunk, yChunk);
+                  DrawScreen();
+              }
+            
               if (tScreen[player.y-1][player.x].style != 'b')
               {
                 player.prevX = player.x;
@@ -394,7 +381,15 @@ void loop()
 
           //MOVE DOWN
           if (UpdatePhysicalBtn(downBtn) == true)
-          {              
+          {
+              if (player.y >= 14)
+              {
+                  player.y = 0;
+                  yChunk += 1;
+                  LoadChunk(xChunk, yChunk);
+                  DrawScreen();
+              }
+            
               if (tScreen[player.y+1][player.x].style != 'b')
               {
                 player.prevX = player.x;
@@ -417,6 +412,14 @@ void loop()
           //MOVE LEFT
           if (UpdatePhysicalBtn(leftBtn) == true)
           {            
+              if (player.x == 0)
+              {
+                  player.x = 14;
+                  xChunk -= 1;
+                  LoadChunk(xChunk, yChunk);
+                  DrawScreen();                  
+              }
+              
               if (tScreen[player.y][player.x-1].style != 'b')
               {
                 player.prevX = player.x;
@@ -439,6 +442,14 @@ void loop()
           //MOVE RIGHT
           if (UpdatePhysicalBtn(rightBtn) == true)
           {
+              if (player.x >= 14)
+              {
+                  player.x = 0;
+                  xChunk += 1;
+                  LoadChunk(xChunk, yChunk);
+                  DrawScreen();                  
+              }
+              
               if (tScreen[player.y][player.x+1].style != 'b')
               {
                 player.prevX = player.x;
