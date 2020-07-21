@@ -1,8 +1,25 @@
+// IMPORTANT: Adafruit_TFTLCD LIBRARY MUST BE SPECIFICALLY
+// CONFIGURED FOR EITHER THE TFT SHIELD OR THE BREAKOUT BOARD.
+// SEE RELEVANT COMMENTS IN Adafruit_TFTLCD.h FOR SETUP.
+//by Open-Smart Team and Catalex Team
+//catalex_inc@163.com
+//Store:   http://dx.com
+//           https://open-smart.aliexpress.com/store/1199788
+//Demo Function: Display graphics, characters
+//Arduino IDE: 1.6.5
+// Board: Arduino UNO R3, Arduino Mega2560,Arduino Leonardo
+
+// Board:OPEN-SMART UNO R3 5V / 3.3V, Arduino UNO R3, Arduino Mega2560
+//3.2INCH TFT:
+// https://www.aliexpress.com/store/product/3-2-TFT-LCD-Display-module-Touch-Screen-Shield-board-onboard-temperature-sensor-w-Touch-Pen/1199788_32755473754.html?spm=2114.12010615.0.0.bXDdc3
+//OPEN-SMART UNO R3 5V / 3.3V:
+// https://www.aliexpress.com/store/product/OPEN-SMART-5V-3-3V-Compatible-UNO-R3-CH340G-ATMEGA328P-Development-Board-with-USB-Cable-for/1199788_32758607490.html?spm=2114.12010615.0.0.ckMTaN
+
 
 #include <Adafruit_GFX.h>    // Core graphics library
 //#include <Adafruit_TFTLCD.h> // Hardware-specific library
-#include <TFTScreen.h>
-TFTScreen tft;
+#include <MCUFRIEND_kbv.h>
+MCUFRIEND_kbv tft;
 
 //***********************************************//
 // If you use OPEN-SMART TFT breakout board                 //
@@ -31,10 +48,10 @@ TFTScreen tft;
 // DB7                -- 7
 
 // Assign human-readable names to some common 16-bit color values:
-#define  BLACK   0x0000
-#define BLUE    0x001F
-#define RED     0xF800
-#define GREEN   0x07E0
+#define	BLACK   0x0000
+#define	BLUE    0x001F
+#define	RED     0xF800
+#define	GREEN   0x07E0
 #define CYAN    0x07FF
 #define MAGENTA 0xF81F
 #define YELLOW  0xFFE0
@@ -71,9 +88,9 @@ void setup(void) {
     if (g_identifier == 0x00D3 || g_identifier == 0xD3D3) g_identifier = 0x9481; // write-only shield
     if (g_identifier == 0xFFFF) g_identifier = 0x9341; // serial
 //    g_identifier = 0x9329;                             // force ID
-  
+	
 
-    tft.begin();//to enable ILI9327 driver code
+    tft.begin(g_identifier);//to enable ILI9327 driver code
   tft.setRotation(3);
   
   Serial.println(F("Benchmark                Time (microseconds)"));
@@ -130,9 +147,9 @@ void setup(void) {
 
 void loop(void) {
   for(uint8_t rotation=0; rotation<4; rotation++) {
-    tft.fillScreen(BLACK);
+  	tft.fillScreen(BLACK);
     tft.setRotation(rotation);
-  tft.setCursor(0, 0);
+	tft.setCursor(0, 0);
   tft.setTextColor(WHITE);  tft.setTextSize(1);
   tft.print(rotation);
   testText();

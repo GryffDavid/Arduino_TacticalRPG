@@ -209,19 +209,35 @@ void setup(void)
     myFile = SD.open("Level.txt");
     if (myFile) 
     {
+        
         Serial.println("Level.txt:");
-
-        if (myFile.available())
-        for (int i = 0; i < 5; i++)
-        {
-          sScreen = myFile.readString();
-          tft.print(".");
-        }
-//        while(myFile.available()) 
-//        {          
-//          sScreen = myFile.readString();         
-//          tft.print(".");
+        char buf[15];
+        
+        uint16_t pos = 0;
+        uint16_t startx = 0;
+        uint16_t starty = 0;
+        
+//        while(myFile.available())
+//        {
+//            Serial.write(myFile.read());
 //        }
+
+        if (myFile.available()) 
+        {
+          //sScreen = myFile.readString();
+          for (int y = 0; y < 15; y++)
+          {
+            pos = (starty+(151*y+y));
+            Serial.print("Start Index: "); Serial.println(pos);
+            Serial.print("End Index: "); Serial.println(pos + 15);
+            myFile.seek(pos);        
+            myFile.readBytes(buf, 15);
+            Serial.println(buf);
+            sScreen += buf;
+            tft.print(".");
+          }
+        }
+        
 
         Serial.print(sScreen);
         
@@ -259,7 +275,7 @@ void setup(void)
     player.prevY = 5;
 
     String str1 = sScreen;
-//
+
 //    Serial.print("/n");
 //    Serial.println(
 //    "bbbbbbbbbbbbgg"

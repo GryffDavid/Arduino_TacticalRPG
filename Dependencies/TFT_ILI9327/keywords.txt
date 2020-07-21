@@ -6,7 +6,8 @@
 # Datatypes (KEYWORD1)
 #######################################
 
-#TFTScreen	KEYWORD1
+MCUFRIEND_kbv	KEYWORD1
+#UTFTGLUE	KEYWORD1
 
 #######################################
 # Methods and Functions (KEYWORD2)
@@ -15,8 +16,8 @@
 #InitLCD	KEYWORD2
 #LCD_Write_DATA	KEYWORD2
 WriteCmdData	KEYWORD2
-begin		KEYWORD2
-#clrScr		KEYWORD2
+begin	KEYWORD2
+#clrScr	KEYWORD2
 color565	KEYWORD2
 #dispBitmap	KEYWORD2
 #drawBitmap	KEYWORD2
@@ -34,22 +35,22 @@ fillRoundRect	KEYWORD2
 fillScreen	KEYWORD2
 #getDisplayXSize	KEYWORD2
 #getDisplayYSize	KEYWORD2
-height		KEYWORD2
-invertDisplay		KEYWORD2
-#lcdOff		KEYWORD2
-#lcdOn		KEYWORD2
-#ltoa		KEYWORD2
-#print		KEYWORD2
+height	KEYWORD2
+invertDisplay	KEYWORD2
+#lcdOff	KEYWORD2
+#lcdOn	KEYWORD2
+#ltoa	KEYWORD2
+#print	KEYWORD2
 #printNumF	KEYWORD2
 #printNumI	KEYWORD2
 #println	KEYWORD2
 pushColors	KEYWORD2
 readGRAM	KEYWORD2
-readID		KEYWORD2
+readID	KEYWORD2
 readPixel	KEYWORD2
-readReg		KEYWORD2
+readReg	KEYWORD2
 readReg32	KEYWORD2
-reset		KEYWORD2
+reset	KEYWORD2
 setAddrWindow	KEYWORD2
 #setBackColor	KEYWORD2
 #setColor	KEYWORD2
@@ -57,10 +58,10 @@ setAddrWindow	KEYWORD2
 setCursor	KEYWORD2
 #setFont	KEYWORD2
 setRotation	KEYWORD2
-#setrgb		KEYWORD2
+#setrgb	KEYWORD2
 setTextColor	KEYWORD2
 setTextSize	KEYWORD2
 #settextcursor	KEYWORD2
 vertScroll	KEYWORD2
-width		KEYWORD2
+width	KEYWORD2
 #write_data_block	KEYWORD2
