@@ -8,21 +8,19 @@
 
 TFTScreen tft;
 
-uint8_t YP = A1;
-uint8_t XM = A2;
-uint8_t YM = 7;
-uint8_t XP = 6;
 
-TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
+
+TouchScreen ts = TouchScreen(6, A1, A2, 7, 300);
 TSPoint tp;
 
 uint8_t SwapXY = 0;
 
-uint16_t TS_LEFT = 880;
-uint16_t TS_RT  = 170;
-uint16_t TS_TOP = 950;
-uint16_t TS_BOT = 180;
 
+   
+uint16_t    TS_LEFT =  180;
+    uint16_t TS_BOT =  170;
+    uint16_t TS_RT =  950;
+    uint16_t TS_TOP = 880;
 
 
 #define MINPRESSURE 20
@@ -131,11 +129,8 @@ class Tile
     uint16_t color; //The colour this tile should be when drawn on screen
 };
 
-//LOAD THE FULL MAP INTO THIS ARRAY OF CHAR
-char screen[15][150];
 String sScreen;
 
-//THIS JUST STORES THE DATA DRAWN ON SCREEN - WHEN TRANSITIONING TO A NEW SCREEN, JUST LOAD FROM THE CHAR ARRAY
 #define xLength 16
 
 Tile tScreen [15][xLength];
@@ -176,19 +171,13 @@ void LoadChunk(uint16_t xStart, uint16_t yStart)
           {
             char buf[16];
             uint16_t pos = ((151*y+y)) + startx;
-            //Serial.print("Start Index: "); Serial.println(pos);
-            //Serial.print("End Index: "); Serial.println(pos + 15);
             myFile.seek(pos);        
             myFile.readBytes(buf, 15);
-            //Serial.println(buf);
             sScreen += buf;
-            //tft.print(".");
           }
         }
-        sScreen.replace('', '\n');
-//        Serial.print("Chunk Loaded");
-//        Serial.print(sScreen);
         
+        sScreen.replace('', '\n');        
         myFile.close();
     } 
     else 
@@ -196,15 +185,14 @@ void LoadChunk(uint16_t xStart, uint16_t yStart)
       Serial.println("error opening Level.txt");
     }
     
-    
-    //tft.println("LOADED!");
-    tft.fillScreen(BLACK);
+    tft.fillRect(0, 0, 16*15, 16*15, BLACK);
 }
 
 void DrawScreen()
 {
-    tft.setCursor(0, 16);
     tft.setFont(&Anims1);
+    tft.setCursor(0, 16);
+   
     String str1 = sScreen;
   
     for (int y = 0; y < 15; y++)
@@ -256,36 +244,20 @@ void DrawScreen()
 void setup(void)
 {
     Serial.begin(9600);
+
+    randomSeed(analogRead(6));
+
+    for (int i = 0; i < 10; i++)
+    {
+      Serial.println(random(0, 400));
+    }
+    
     identifier = tft.readID();
     tft.begin(identifier);    
-    switch (Orientation) 
-    {
-        case 0:  
-        break;
-          
-        case 1:   
-            tmp = TS_LEFT, 
-            TS_LEFT = TS_BOT, 
-            TS_BOT = TS_RT, 
-            TS_RT = TS_TOP, 
-            TS_TOP = tmp;  
-        break;
-          
-        case 2:   
-          SWAP(TS_LEFT, TS_RT); 
-          SWAP(TS_TOP, TS_BOT); 
-        break;
-        
-        case 3:   
-          tmp = TS_LEFT, 
-          TS_LEFT = TS_TOP, 
-          TS_TOP = TS_RT, 
-          TS_RT = TS_BOT, 
-          TS_BOT = tmp;  
-        break;
-    }
 
-    ts = TouchScreen(XP, YP, XM, YM, 300);     //call the constructor AGAIN with new values.
+        
+    //ts = TouchScreen(XP, YP, XM, YM, 300);
+    
     tft.setRotation(Orientation);
     tft.fillScreen(BLACK);  
 
@@ -303,7 +275,11 @@ void setup(void)
     }
 
     tft.println("Loading...");
-
+    
+    tft.fillRect(240, 0, 160, 240, BLACK);
+    tft.setCursor(16*15+16, 16);
+    tft.println("HP: 10/10");
+    
     LoadChunk(xChunk, yChunk);
     DrawScreen();
     
@@ -317,20 +293,16 @@ void setup(void)
     pinMode(rightBtn.buttonPin, INPUT);
     pinMode(downBtn.buttonPin, INPUT);
     
-    player.x = 5;
-    player.y = 5;
+    player.x = 1;
+    player.y = 1;
 
-    player.prevX = 5;
-    player.prevY = 5;
+    player.prevX = 1;
+    player.prevY = 1;    
 
-    
-
-  	tft.setCursor(player.x * 16, player.y * 16 + 16);
+  	tft.setCursor(16, 32);
   	tft.print('a');
 
     UpButton.InitButton(&tft, 0, 0, 64, 64, WHITE, BLACK, BLACK, "");
-
-    tft.fillRect(240, 0, 160, 240, BLACK);
     
     delay(1000);
 }
@@ -340,10 +312,10 @@ void loop()
     uint16_t xpos, ypos;
     tp = ts.getPoint();
 
-    pinMode(XM, OUTPUT);
-    pinMode(YP, OUTPUT);
-    pinMode(XP, OUTPUT);
-    pinMode(YM, OUTPUT);
+    pinMode(A2, OUTPUT);
+    pinMode(A1, OUTPUT);
+    pinMode(6, OUTPUT);
+    pinMode(7, OUTPUT);
 
     switch (CurrentGameState)
     {
@@ -358,6 +330,11 @@ void loop()
                   yChunk -= 1;
                   LoadChunk(xChunk, yChunk);
                   DrawScreen();
+
+                  tft.setTextColor(RED);
+                  tft.setCursor(player.x * 16, player.y * 16 + 16);
+                  tft.print('a');
+                  break;
               }
             
               if (tScreen[player.y-1][player.x].style != 'b')
@@ -388,6 +365,11 @@ void loop()
                   yChunk += 1;
                   LoadChunk(xChunk, yChunk);
                   DrawScreen();
+
+                  tft.setTextColor(RED);
+                  tft.setCursor(player.x * 16, player.y * 16 + 16);
+                  tft.print('a');
+                  break;
               }
             
               if (tScreen[player.y+1][player.x].style != 'b')
@@ -417,7 +399,12 @@ void loop()
                   player.x = 14;
                   xChunk -= 1;
                   LoadChunk(xChunk, yChunk);
-                  DrawScreen();                  
+                  DrawScreen();      
+
+                  tft.setTextColor(RED);
+                  tft.setCursor(player.x * 16, player.y * 16 + 16);
+                  tft.print('a');
+                  break;
               }
               
               if (tScreen[player.y][player.x-1].style != 'b')
@@ -447,7 +434,12 @@ void loop()
                   player.x = 0;
                   xChunk += 1;
                   LoadChunk(xChunk, yChunk);
-                  DrawScreen();                  
+                  DrawScreen();  
+
+                  tft.setTextColor(RED);
+                  tft.setCursor(player.x * 16, player.y * 16 + 16);
+                  tft.print('a');
+                  break;
               }
               
               if (tScreen[player.y][player.x+1].style != 'b')
@@ -485,6 +477,8 @@ void loop()
       xpos = map(tp.x, TS_LEFT, TS_RT, 0, tft.width());
       ypos = map(tp.y, TS_TOP, TS_BOT, 0, tft.height());
 
+
+      tft.fillCircle(xpos, ypos, 4, RED);
       switch (CurrentGameState)
       {
           case World:
@@ -541,7 +535,7 @@ bool UpdatePhysicalBtn(cBtn &button)
 	if ((millis() - button.lastDebounceTime) > button.debounceDelay && reading != button.buttonState)
 	{
 		button.buttonState = reading;
-		if (button.buttonState == LOW)
+		if (button.buttonState == HIGH)
 		{
 			result = true;
 		}
