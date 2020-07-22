@@ -45,8 +45,8 @@
 
 #define BROKEN 64512
 
-enum GameState { Menu, Creator, World, CharacterScreen, Combat };
-enum PlayerState { Normal, SelectMode };
+enum GameState { Menu, Creator, World, CharacterScreen, VATS };
+enum PlayerState { Normal, SelectMode, Combat };
 
 class cBtn
 {
@@ -62,27 +62,47 @@ class cBtn
 
 class Game;
 
+class Item
+{
+	public:
+		Item(void);
+		byte x, y;
+};
+
+class MeleeWeapon
+{
+	public:
+		byte Damage;
+};
+
+class Gun
+{
+	public:
+		byte ReloadAP, Range, Damage, APCost, Magazine;
+		char Style; //The character to represent this weapon in menus etc
+};
+
 class Selector
 {
-public:
-	Selector();
-	byte _x, _y;
-	bool _active = false;
-	void GetGame(Game *game) { _game = game; };
-	void GetScreen(TFTScreen *screen) { _screen = screen; };
-	void Init(byte xPos, byte yPos, char uChar, uint16_t uColor);
-	void Update(unsigned long elapsed);
-	void Draw();
-	void Undraw();
-	void Move(int xpos, int ypos, char uChar, uint16_t uColor);
+	public:
+		Selector();
+		byte _x, _y;
+		bool _active = false;
+		void GetGame(Game *game) { _game = game; };
+		void GetScreen(TFTScreen *screen) { _screen = screen; };
+		void Init(byte xPos, byte yPos, char uChar, uint16_t uColor);
+		void Update(unsigned long elapsed);
+		void Draw();
+		void Undraw();
+		void Move(int xpos, int ypos, char uChar, uint16_t uColor);
 
-private:
-	Game * _game;
-	TFTScreen * _screen;	
-	uint16_t _curTime, _maxTime;
-	uint16_t _color, _uColor;
-	char _uChar;	
-	bool _flash = false; //Whether the selector is drawn or the character underneath
+	private:
+		Game * _game;
+		TFTScreen * _screen;	
+		uint16_t _curTime, _maxTime;
+		uint16_t _color, _uColor;
+		char _uChar;	
+		bool _flash = false; //Whether the selector is drawn or the character underneath
 };
 
 class Explosion
@@ -94,7 +114,7 @@ class Explosion
 		void Init(byte xPos, byte yPos, char uChar, uint16_t uColor);		
 		void Update(unsigned long elapsed);
 		void Draw();
-		void Undraw();
+		void Undraw();		
 
 	private:
 		Game * _game;
@@ -116,6 +136,8 @@ class Enemy
 {
 	public:
 		Enemy(void);
+		void EndTurn();
+		void StartTurn();
 		byte x, y;
 		byte STR, DEX;
 		byte MaxHP, CurHP;
@@ -124,6 +146,8 @@ class Enemy
 		String Name;
 		uint16_t Color;
 		bool Active, Targeted;
+		bool MyTurn = false;
+		bool HadTurn = false;
 };
 
 class Player
@@ -131,9 +155,15 @@ class Player
 	public:
 		Player(void);
 
+		void EndTurn();
+		void StartTurn();
 		void SelectEnemy(Enemy *enemy) { _selectedEnemy = enemy; };
+		void GetGame(Game *game) { _game = game; };
 
 		PlayerState PlayerState = Normal;
+
+		Gun CurrentGun;
+		MeleeWeapon CurrentMelee;
 
 		//Position
 		byte x, prevX;
@@ -153,8 +183,12 @@ class Player
 		byte MaxAP, CurAP; //Action points
 		byte Level;
 
+		bool MyTurn = false;
+		bool HadTurn = false;
+
 	private:
 		Enemy * _selectedEnemy;
+		Game * _game;
 };
 
 
@@ -164,25 +198,6 @@ class NPC
 	public:
 		NPC(void);
 		byte x, y;
-};
-
-class Item
-{
-	public:
-		Item(void);
-		byte x, y;
-};
-
-class MeleeWeapon
-{
-	public:
-		byte Damage;
-};
-
-class Gun
-{
-	public:
-		byte ReloadAP, Range, Damage, APCost, Magazine;
 };
 
 class Tile
@@ -216,6 +231,7 @@ class Game
 		Game();
 
 		void Init();
+		void LoadPlayer(); //Load the save data
 		void Loop();
 		void Input();
 		void MovePlayer();
@@ -223,6 +239,8 @@ class Game
 		void LoadEnemies(uint16_t xStart, uint16_t yStart);
 		void CopyFile(String sourceFile, String destFile);
 		void DrawScreen();
+		void  DrawUI();
+		void UpdateEnemies();
 		void DrawEnemies();
 		void CheckTouchScreen();
 
@@ -258,7 +276,7 @@ class Game
 		cBtn downBtn = cBtn(32);
 
 		cBtn aButton = cBtn(34);
-		cBtn bButton = cBtn(36);
+		cBtn bButton = cBtn(36);		
 	private:
 };
 

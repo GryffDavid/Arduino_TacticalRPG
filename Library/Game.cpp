@@ -1,9 +1,5 @@
 #include "Game.h"
 
-Enemy::Enemy(void)
-{
-}
-
 NPC::NPC(void)
 {
 }
@@ -47,17 +43,6 @@ bool cBtn::UpdatePhysicalBtn()
 	return result;
 }
 
-
-Player::Player(void)
-{
-	x = 1;
-	y = 1;
-	prevX = 1;
-	prevY = 1;
-
-	CurHP = 10;
-	MaxHP = 10;
-}
 
 
 Explosion::Explosion()
@@ -270,6 +255,45 @@ void ActivityFeed::Update(String activity)
 
 
 
+Enemy::Enemy(void)
+{
+}
+
+void Enemy::EndTurn()
+{
+	MyTurn = false;
+	HadTurn = true;
+}
+
+
+
+Player::Player(void)
+{
+	x = 1;
+	y = 1;
+	prevX = 1;
+	prevY = 1;
+
+	CurHP = 10;
+	MaxHP = 10;
+}
+
+void Player::EndTurn()
+{
+	MyTurn = false;
+	HadTurn = true;
+}
+
+void Player::StartTurn()
+{
+	HadTurn = false;
+	MyTurn = true;
+	CurAP = MaxAP;
+	_game->DrawUI();
+}
+
+
+
 Game::Game()
 {
 	xChunk = 0;
@@ -294,34 +318,13 @@ void Game::Init()
 	if (!SD.begin(SD_CS)) { tft.println("SD failed to initialise"); while (1); }
 
 	//CopyFile("OENS.txt", "ENS.txt");
-
-	tft.setCursor(16 * 20 + 16, 16);
-	tft.println("HP: " + (String)player.CurHP + '/' + (String)player.MaxHP);
-
-	tft.setCursor(16 * 20 + 16, 24);
-	tft.println("AP: " + (String)player.CurAP + '/' + (String)player.MaxAP);
-
-	//tft.setCursor(16 * 20 + 16, 24);
-	//tft.print("STR: " + player.STR);
-
-	//tft.setCursor(16 * 20 + 16, 32);
-	//tft.print("DEX: " + player.DEX);
-
-	//tft.setCursor(16 * 20 + 16, 40);
-	//tft.print("CON: " + player.CON);
-
-	//tft.setCursor(16 * 20 + 16, 48);
-	//tft.print("INT: " + player.INT);
-
-	//tft.setCursor(16 * 20 + 16, 56);
-	//tft.print("WIS: " + player.WIS);
-
-	//tft.setCursor(16 * 20 + 16, 64);
-	//tft.print("CHA: " + player.CHA);
-
+	LoadPlayer();
+	DrawUI();
+	
 	selector.GetGame(this);
 	explosion.GetGame(this);
 	activityFeed.GetGame(this);
+	player.GetGame(this);
 
 	selector.GetScreen(&tft);
 	explosion.GetScreen(&tft);
@@ -330,19 +333,11 @@ void Game::Init()
 	LoadEnemies(xChunk, yChunk);
 	LoadChunk(xChunk, yChunk);
 	
+	
 	DrawEnemies();
 
 	activityFeed.Update("WELCOME!");
 	
-
-	//tft.setFont();
-	//tft.setTextColor(WHITE);
-	//tft.setCursor(0, 16 * 15 - 32);
-	//tft.println("Dialogue goes here!");
-	//tft.println("Dialogue goes here 2!");
-	//tft.println("Dialogue goes here 3!");
-	//tft.println("Dialogue goes here 4!");
-
 	tft.setFont(&Anims1);
 }
 
@@ -356,6 +351,7 @@ void Game::Loop()
 	    case World:
 	    {
 			Input();
+			UpdateEnemies();
 
 			explosion.Update(ElaspedTime);
 			selector.Update(ElaspedTime);
@@ -371,103 +367,371 @@ void Game::Loop()
 	CheckTouchScreen();
 }
 
-void Game::LoadChunk(uint16_t xStart, uint16_t yStart)
+void Game::Input()
 {
-	xStart *= xLength - 1;
-	yStart *= yLength - 1;
-
-	sScreen = "";
-	
-	//Load Tiles
-	myFile = SD.open("LVL.txt");
-
-	if (myFile)
+	if ((player.PlayerState == Combat && player.CurAP > 0 && player.MyTurn == true) || player.PlayerState == Normal)
 	{
-		if (myFile.available())
+		MovePlayer();
+	}
+
+	switch (player.PlayerState)
+	{
+	case Normal:
+	{
+		if (aButton.UpdatePhysicalBtn() == true)
 		{
-			for (byte y = yStart; y < yStart + yLength-1; y++)
+			//selector.GetGame(this);
+			selector.Init(player.x, player.y, tScreen[player.y][player.x].style, tScreen[player.y][player.x].color);
+
+			for (byte i = 0; i < 10; i++)
 			{
-				char buf[xLength-1];
-				uint16_t pos = ((151 * y + y)) + xStart;
-				myFile.seek(pos);
-				myFile.readBytes(buf, sizeof(buf));
-				
-				sScreen += buf;
-				sScreen += '\n';
+				enemies[i].Targeted = false;
 			}
+
+			player.PlayerState = SelectMode;
+			activityFeed.Update("Select Target");
+		}
+	}
+	break;
+
+	case Combat:
+	{
+		if (player.MyTurn == true && player.CurAP == 0)
+		{
+			player.EndTurn();
+			activityFeed.Update("Turn Ended");
 		}
 
-		myFile.close();
-	}
-	else
-	{
-		tft.println("error opening LVL.txt");
-	}
-
-	LoadEnemies(xStart, yStart);
-
-	tft.fillRect(0, 0, 16 * (xLength-1), 16 * (yLength-1), BLACK);
-	DrawScreen();
-	DrawEnemies();
-
-	tft.setTextColor(RED);
-	tft.setCursor(player.x * 16, player.y * 16 + 16);
-	tft.print('a');
-}
-
-void Game::LoadEnemies(uint16_t xStart, uint16_t yStart)
-{
-	//xStart *= xLength - 1;
-	//yStart *= yLength - 1;
-	for (byte i = 0; i < 10; i++)
-	{
-		enemies[i].Active = false;
-	}
-
-	myFile = SD.open("ENS.txt");
-	uint8_t eInd = 0;
-
-	if (myFile)
-	{
-		if (myFile.available())
+		if (bButton.UpdatePhysicalBtn() == true)
 		{
-			for (byte y = yStart; y < yStart + yLength - 1; y++)
+			if (player.CurAP < player.CurrentGun.APCost)
 			{
-				char buf[xLength - 1];
-				uint16_t pos = ((151 * y + y)) + xStart;
-				myFile.seek(pos);
-				myFile.readBytes(buf, sizeof(buf));
-				
-				for (byte x = 0; x < sizeof(buf); x++)
-				{
-					switch (buf[x])
-					{
-						default:
-						break;
+				activityFeed.Update("Not enough action points");
+			}
 
-						case 'h':
-						{
-							enemies[eInd].x = x;
-							enemies[eInd].y = y;
-							enemies[eInd].Style = 'h';
-							enemies[eInd].Name = "Alien";
-							enemies[eInd].Active = true;
-							enemies[eInd].Color = PINK;
-							eInd += 1;
-						}
-						break;
-					}
+			if (player.HasTarget == true && player.CurAP >= player.CurrentGun.APCost)
+			{
+				player.CurAP -= player.CurrentGun.APCost;
+				DrawUI();
+
+				double deltaX = (player.x * 16 + 8) - (160 + 8); //X Change
+				double deltaY = (player.y * 16 + 8) - (160 + 8); //Y Change
+
+				double grad = (double)deltaY / (double)deltaX;
+				double d = sqrt((deltaX * deltaX) + (deltaY * deltaY));
+
+				Serial.println(grad);
+				Serial.println(d);
+				Serial.println(deltaX);
+				Serial.println(deltaY);
+
+				uint16_t cols[(uint16_t)d];
+
+				for (uint16_t i = 0; i < (uint16_t)abs(deltaX); i++)
+				{
+					cols[i] = tft.readPixel((player.x * 16) + 8 + i, (player.y * 16) + 8 + (i * grad));
+					tft.drawPixel((player.x * 16) + 8 + i, (player.y * 16) + 8 + (i*grad), WHITE);
+				}
+
+				explosion.Init(selector._x, selector._y, tScreen[selector._y][selector._x].style, tScreen[selector._y][selector._x].color);
+
+				//Read and store the colour of all the pixels in the line,
+				//Then draw the white line
+				//Wait, then draw the colour of the original pixels back again
+				//ReadPixel()
+
+
+				for (uint16_t i = 0; i < (uint16_t)abs(deltaX); i++)
+				{
+					tft.drawPixel((player.x * 16) + 8 + i, (player.y * 16) + 8 + (i*grad), cols[i]);
+				}
+
+				activityFeed.Update("Fired shot");
+
+				//for (int x = player.x; x < 10; x++)
+				//{
+				//	uint16_t blockX = x;
+				//	uint16_t blockY = player.y + (x * grad);
+
+				//	tft.fillRect(blockX * 16, blockY * 16 - 16, 16, 16, BLACK);
+				//	tft.setCursor(blockX * 16, blockY * 16 + 16);
+				//	tft.setTextColor(tScreen[blockY][blockX].color);
+				//	tft.print(tScreen[blockY][blockX].style);
+				//}
+
+
+				//tft.fillRect(x * 16, y * 16, 16, 16, BLACK);
+				//tft.setCursor(x * 16, y * 16);
+				//tft.setTextColor(tScreen[y][x].color);
+				//tft.print(tScreen[y][x].style);
+
+
+				//Calculate which blocks it intersected along the path
+				//Redraw those blocks when necessary?
+				//Also solid blocks need to stop shots
+
+				//Could also change to black screen for combat and make things easier
+				return;
+			}
+		}
+	}
+	break;
+
+	case SelectMode:
+	{
+		if (aButton.UpdatePhysicalBtn() == true)
+		{
+			player.PlayerState = Normal;
+			selector._active = false;
+			selector.Undraw();
+			activityFeed.Update("Targeting cancelled");
+			player.HasTarget = false;
+			return;
+		}
+
+		if (bButton.UpdatePhysicalBtn() == true)
+		{
+			player.PlayerState = Normal;
+			bool foundTarget = false;
+
+			for (byte i = 0; i < 10; i++)
+			{
+				if (enemies[i].x == selector._x &&
+					enemies[i].y == selector._y)
+				{
+					activityFeed.Update("Target selected: " + enemies[i].Name);
+					player.PlayerState = Combat;
+					activityFeed.Update("Entered combat");
+					player.MyTurn = true;
+					enemies[i].Targeted = true;
+					player.HasTarget = true;
+					foundTarget = true;
+					player.SelectEnemy(&enemies[i]);
 				}
 			}
+
+			if (foundTarget == false)
+			{
+				player.HasTarget = false;
+				activityFeed.Update("No target selected");
+			}
+
+			selector._active = false;
+			selector.Undraw();
 		}
 
-		myFile.close();
+		if (rightBtn.UpdatePhysicalBtn() == true)
+		{
+			selector.Move(1, 0, tScreen[selector._y][selector._x + 1].style, tScreen[selector._y][selector._x + 1].color);
+		}
+
+		if (leftBtn.UpdatePhysicalBtn() == true)
+		{
+			selector.Move(-1, 0, tScreen[selector._y][selector._x - 1].style, tScreen[selector._y][selector._x - 1].color);
+		}
+
+		if (topBtn.UpdatePhysicalBtn() == true)
+		{
+			selector.Move(0, -1, tScreen[selector._y - 1][selector._x].style, tScreen[selector._y - 1][selector._x].color);
+		}
+
+		if (downBtn.UpdatePhysicalBtn() == true)
+		{
+			selector.Move(0, 1, tScreen[selector._y + 1][selector._x].style, tScreen[selector._y + 1][selector._x].color);
+		}
 	}
-	else
-	{
-		tft.println("error opening ENS.txt");
+	break;
 	}
 }
+
+void Game::MovePlayer()
+{
+	//MOVE UP
+	if (topBtn.UpdatePhysicalBtn() == true)
+	{
+		if (player.PlayerState == Combat)
+		{
+			player.CurAP--;
+			DrawUI();
+		}
+
+		if (player.y == 0)
+		{
+			player.y = yLength - 2;
+			yChunk -= 1;
+			LoadChunk(xChunk, yChunk);
+			return;
+		}
+
+		for (uint8_t i = 0; i < 10; i++)
+		{
+			if (enemies[i].Active == true)
+				if (enemies[i].x == player.x &&
+					enemies[i].y == player.y - 1)
+				{
+					return;
+				}
+		}
+
+		if (tScreen[player.y - 1][player.x].style != 'b')
+		{
+			player.prevX = player.x;
+			player.prevY = player.y;
+
+			player.y -= 1;
+
+			tft.fillRect(player.prevX * 16, player.prevY * 16, 16, 16, BLACK);
+
+			tft.setTextColor(RED);
+			tft.setCursor(player.x * 16, player.y * 16 + 16);
+			tft.print('a');
+
+			tft.setTextColor(tScreen[player.prevY][player.prevX].color);
+			tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
+			tft.print(tScreen[player.prevY][player.prevX].style);
+		}
+	}
+
+	//MOVE DOWN
+	if (downBtn.UpdatePhysicalBtn() == true)
+	{
+		if (player.PlayerState == Combat)
+		{
+			player.CurAP--;
+			DrawUI();
+		}
+
+		if (player.y >= yLength - 2)
+		{
+			player.y = 0;
+			yChunk += 1;
+			LoadChunk(xChunk, yChunk);
+			return;
+		}
+
+		for (uint8_t i = 0; i < 10; i++)
+		{
+			if (enemies[i].Active == true)
+				if (enemies[i].x == player.x &&
+					enemies[i].y == player.y + 1)
+				{
+					return;
+				}
+		}
+
+		if (tScreen[player.y + 1][player.x].style != 'b')
+		{
+			player.prevX = player.x;
+			player.prevY = player.y;
+
+			player.y += 1;
+
+			tft.fillRect(player.prevX * 16, player.prevY * 16, 16, 16, BLACK);
+
+			tft.setTextColor(RED);
+			tft.setCursor(player.x * 16, player.y * 16 + 16);
+			tft.print('a');
+
+			tft.setTextColor(tScreen[player.prevY][player.prevX].color);
+			tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
+			tft.print(tScreen[player.prevY][player.prevX].style);
+		}
+	}
+
+	//MOVE LEFT
+	if (leftBtn.UpdatePhysicalBtn() == true)
+	{
+		if (player.PlayerState == Combat)
+		{
+			player.CurAP--;
+			DrawUI();
+		}
+
+		if (player.x == 0)
+		{
+			player.x = xLength - 2;
+			xChunk -= 1;
+			LoadChunk(xChunk, yChunk);
+			return;
+		}
+
+		for (uint8_t i = 0; i < 10; i++)
+		{
+			if (enemies[i].Active == true)
+				if (enemies[i].x == player.x - 1 &&
+					enemies[i].y == player.y)
+				{
+					return;
+				}
+		}
+
+		if (tScreen[player.y][player.x - 1].style != 'b')
+		{
+			player.prevX = player.x;
+			player.prevY = player.y;
+
+			player.x -= 1;
+
+			tft.fillRect(player.prevX * 16, player.prevY * 16, 16, 16, BLACK);
+
+			tft.setTextColor(RED);
+			tft.setCursor(player.x * 16, player.y * 16 + 16);
+			tft.print('a');
+
+			tft.setTextColor(tScreen[player.prevY][player.prevX].color);
+			tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
+			tft.print(tScreen[player.prevY][player.prevX].style);
+		}
+	}
+
+	//MOVE RIGHT
+	if (rightBtn.UpdatePhysicalBtn() == true)
+	{
+		if (player.PlayerState == Combat)
+		{
+			player.CurAP--;
+			DrawUI();
+		}
+
+		if (player.x >= xLength - 2)
+		{
+			player.x = 0;
+			xChunk += 1;
+			LoadChunk(xChunk, yChunk);
+			return;
+		}
+
+		for (uint8_t i = 0; i < 10; i++)
+		{
+			if (enemies[i].Active == true)
+				if (enemies[i].x == player.x + 1 &&
+					enemies[i].y == player.y)
+				{
+					return;
+				}
+		}
+
+		if (tScreen[player.y][player.x + 1].style != 'b')
+		{
+			player.prevX = player.x;
+			player.prevY = player.y;
+
+			player.x += 1;
+
+			tft.fillRect(player.prevX * 16, player.prevY * 16, 16, 16, BLACK);
+
+			tft.setTextColor(RED);
+			tft.setCursor(player.x * 16, player.y * 16 + 16);
+			tft.print('a');
+
+			tft.setTextColor(tScreen[player.prevY][player.prevX].color);
+			tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
+			tft.print(tScreen[player.prevY][player.prevX].style);
+		}
+	}
+}
+
+
 
 void Game::DrawScreen()
 {
@@ -520,6 +784,21 @@ void Game::DrawScreen()
 	}
 }
 
+void Game::DrawUI()
+{
+	tft.fillRect(16 * (xLength-1), 0, 5*16, 240, BLACK);
+	tft.setFont();
+	tft.setTextColor(GREEN);
+
+	tft.setCursor(16 * 20 + 16, 16);
+	tft.println("HP: " + (String)player.CurHP + '/' + (String)player.MaxHP);
+
+	tft.setCursor(16 * 20 + 16, 24);
+	tft.println("AP: " + (String)player.CurAP + '/' + (String)player.MaxAP);
+
+	tft.setFont(&Anims1);
+}
+
 void Game::DrawEnemies()
 {
 	for (uint8_t i = 0; i < 10; i++)
@@ -538,321 +817,146 @@ void Game::DrawEnemies()
 	}
 }
 
-void Game::Input()
+void Game::UpdateEnemies()
 {
-	switch (player.PlayerState)
+	for (byte i = 0; i < 10; i++)
 	{
-		case Normal:
+		if (enemies[i].Active == true && player.MyTurn == false && player.HadTurn == true)
 		{
-			if (aButton.UpdatePhysicalBtn() == true)
-			{
-				//selector.GetGame(this);
-				selector.Init(player.x, player.y, tScreen[player.y][player.x].style, tScreen[player.y][player.x].color);
-
-				for (byte i = 0; i < 10; i++)
-				{
-					enemies[i].Targeted = false;
-				}
-
-				player.PlayerState = SelectMode;
-				activityFeed.Update("Select Target");
-			}
-
-			if (bButton.UpdatePhysicalBtn() == true)
-			{
-				if (player.HasTarget == true)
-				{
-					double deltaX = (player.x * 16 + 8) - (160 + 8); //X Change
-					double deltaY = (player.y * 16 + 8) - (160 + 8); //Y Change
-
-					double grad = (double)deltaY / (double)deltaX;
-					double d = sqrt((deltaX * deltaX) + (deltaY * deltaY));
-
-					Serial.println(grad);
-					Serial.println(d);
-					Serial.println(deltaX);
-					Serial.println(deltaY);
-
-					uint16_t cols[(uint16_t)d];
-
-					for (uint16_t i = 0; i < (uint16_t)abs(deltaX); i++)
-					{
-						cols[i] = tft.readPixel((player.x * 16) + 8 + i, (player.y * 16) + 8 + (i * grad));
-						tft.drawPixel((player.x * 16) + 8 + i, (player.y * 16) + 8 + (i*grad), WHITE);
-					}
-
-					//delay(200);
-
-	//				explosion.GetGame(this);
-					explosion.Init(selector._x, selector._y, tScreen[selector._y][selector._x].style, tScreen[selector._y][selector._x].color);
-
-					//Read and store the colour of all the pixels in the line,
-					//Then draw the white line
-					//Wait, then draw the colour of the original pixels back again
-					//ReadPixel()
-
-
-					for (uint16_t i = 0; i < (uint16_t)abs(deltaX); i++)
-					{
-						tft.drawPixel((player.x * 16) + 8 + i, (player.y * 16) + 8 + (i*grad), cols[i]);
-					}
-
-					//for (int x = player.x; x < 10; x++)
-					//{
-					//	uint16_t blockX = x;
-					//	uint16_t blockY = player.y + (x * grad);
-
-					//	tft.fillRect(blockX * 16, blockY * 16 - 16, 16, 16, BLACK);
-					//	tft.setCursor(blockX * 16, blockY * 16 + 16);
-					//	tft.setTextColor(tScreen[blockY][blockX].color);
-					//	tft.print(tScreen[blockY][blockX].style);
-					//}
-
-
-					//tft.fillRect(x * 16, y * 16, 16, 16, BLACK);
-					//tft.setCursor(x * 16, y * 16);
-					//tft.setTextColor(tScreen[y][x].color);
-					//tft.print(tScreen[y][x].style);
-
-
-					//Calculate which blocks it intersected along the path
-					//Redraw those blocks when necessary?
-					//Also solid blocks need to stop shots
-
-					//Could also change to black screen for combat and make things easier
-				}
-			}
-			
-			MovePlayer();
+			enemies[i].MyTurn = true;
+			//Attack player
+			//Add pauses in between so that the turn isn't over in 30 milliseconds
+			enemies[i].EndTurn();
 		}
-		break;
 
-		case SelectMode:
+		if (player.HadTurn == true && player.MyTurn == false)
 		{
-			if (aButton.UpdatePhysicalBtn() == true)
-			{
-				player.PlayerState = Normal;
-				selector._active = false;
-				selector.Undraw();
-				activityFeed.Update("Targeting cancelled");
-				player.HasTarget = false;
-				return;
-			}
-
-			if (bButton.UpdatePhysicalBtn() == true)
-			{
-				player.PlayerState = Normal;
-				bool foundTarget = false;
-
-				for (byte i = 0; i < 10; i++)
-				{
-					if (enemies[i].x == selector._x &&
-						enemies[i].y == selector._y)
-					{
-						activityFeed.Update("Target selected: " + enemies[i].Name);
-						enemies[i].Targeted = true;
-						player.HasTarget = true;
-						foundTarget = true;
-						player.SelectEnemy(&enemies[i]);
-					}
-				}
-
-				if (foundTarget == false)
-				{
-					player.HasTarget = false;
-					activityFeed.Update("No target selected");
-				}
-
-				selector._active = false;
-				selector.Undraw();
-			}
-
-			if (rightBtn.UpdatePhysicalBtn() == true)
-			{
-				selector.Move(1, 0, tScreen[selector._y][selector._x+1].style, tScreen[selector._y][selector._x+1].color);
-			}
-
-			if (leftBtn.UpdatePhysicalBtn() == true)
-			{
-				selector.Move(-1, 0, tScreen[selector._y][selector._x - 1].style, tScreen[selector._y][selector._x - 1].color);
-			}
-
-			if (topBtn.UpdatePhysicalBtn() == true)
-			{
-				selector.Move(0, -1, tScreen[selector._y - 1][selector._x].style, tScreen[selector._y - 1][selector._x].color);
-			}
-
-			if (downBtn.UpdatePhysicalBtn() == true)
-			{
-				selector.Move(0, 1, tScreen[selector._y + 1][selector._x].style, tScreen[selector._y + 1][selector._x].color);
-			}
+			player.StartTurn();
+			activityFeed.Update("Turn Started");
 		}
-		break;
 	}
 }
 
-void Game::MovePlayer()
+
+
+void Game::LoadPlayer()
 {
-	//MOVE UP
-	if (topBtn.UpdatePhysicalBtn() == true)
+	player.STR = 5;
+	player.PER = 5;
+	player.END = 5;
+	player.CHA = 5;
+	player.INT = 5;
+	player.AGI = 5;
+	player.LUC = 5;
+
+	player.MaxAP = (int)(5 / 2) + 5;
+	player.CurAP = player.MaxAP;
+
+	Gun tmpGun;
+	tmpGun.APCost = 5;
+	tmpGun.Damage = 10;
+	player.CurrentGun = tmpGun;
+}
+
+void Game::LoadChunk(uint16_t xStart, uint16_t yStart)
+{
+	xStart *= xLength - 1;
+	yStart *= yLength - 1;
+
+	sScreen = "";
+
+	//Load Tiles
+	myFile = SD.open("LVL.txt");
+
+	if (myFile)
 	{
-		if (player.y == 0)
+		if (myFile.available())
 		{
-			player.y = yLength - 2;
-			yChunk -= 1;
-			LoadChunk(xChunk, yChunk);
-			return;
+			for (byte y = yStart; y < yStart + yLength - 1; y++)
+			{
+				char buf[xLength - 1];
+				uint16_t pos = ((151 * y + y)) + xStart;
+				myFile.seek(pos);
+				myFile.readBytes(buf, sizeof(buf));
+
+				sScreen += buf;
+				sScreen += '\n';
+			}
 		}
 
-		for (uint8_t i = 0; i < 10; i++)
-		{
-			if (enemies[i].Active == true)
-				if (enemies[i].x == player.x &&
-					enemies[i].y == player.y - 1)
-				{
-					return;
-				}
-		}
-
-		if (tScreen[player.y - 1][player.x].style != 'b')
-		{
-			player.prevX = player.x;
-			player.prevY = player.y;
-
-			player.y -= 1;
-
-			tft.fillRect(player.prevX * 16, player.prevY * 16, 16, 16, BLACK);
-
-			tft.setTextColor(RED);
-			tft.setCursor(player.x * 16, player.y * 16 + 16);
-			tft.print('a');
-
-			tft.setTextColor(tScreen[player.prevY][player.prevX].color);
-			tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
-			tft.print(tScreen[player.prevY][player.prevX].style);
-		}
+		myFile.close();
+	}
+	else
+	{
+		tft.println("error opening LVL.txt");
 	}
 
-	//MOVE DOWN
-	if (downBtn.UpdatePhysicalBtn() == true)
+	LoadEnemies(xStart, yStart);
+
+	tft.fillRect(0, 0, 16 * (xLength - 1), 16 * (yLength - 1), BLACK);
+	DrawScreen();
+	DrawEnemies();
+
+	tft.setTextColor(RED);
+	tft.setCursor(player.x * 16, player.y * 16 + 16);
+	tft.print('a');
+}
+
+void Game::LoadEnemies(uint16_t xStart, uint16_t yStart)
+{
+	//xStart *= xLength - 1;
+	//yStart *= yLength - 1;
+	for (byte i = 0; i < 10; i++)
 	{
-		if (player.y >= yLength - 2)
-		{
-			player.y = 0;
-			yChunk += 1;
-			LoadChunk(xChunk, yChunk);
-			return;
-		}
-
-		for (uint8_t i = 0; i < 10; i++)
-		{
-			if (enemies[i].Active == true)
-				if (enemies[i].x == player.x &&
-					enemies[i].y == player.y + 1)
-				{
-					return;
-				}
-		}
-
-		if (tScreen[player.y + 1][player.x].style != 'b')
-		{
-			player.prevX = player.x;
-			player.prevY = player.y;
-
-			player.y += 1;
-
-			tft.fillRect(player.prevX * 16, player.prevY * 16, 16, 16, BLACK);
-
-			tft.setTextColor(RED);
-			tft.setCursor(player.x * 16, player.y * 16 + 16);
-			tft.print('a');
-
-			tft.setTextColor(tScreen[player.prevY][player.prevX].color);
-			tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
-			tft.print(tScreen[player.prevY][player.prevX].style);
-		}
+		enemies[i].Active = false;
 	}
 
-	//MOVE LEFT
-	if (leftBtn.UpdatePhysicalBtn() == true)
+	myFile = SD.open("ENS.txt");
+	uint8_t eInd = 0;
+
+	if (myFile)
 	{
-		if (player.x == 0)
+		if (myFile.available())
 		{
-			player.x = xLength - 2;
-			xChunk -= 1;
-			LoadChunk(xChunk, yChunk);
-			return;
-		}
+			for (byte y = yStart; y < yStart + yLength - 1; y++)
+			{
+				char buf[xLength - 1];
+				uint16_t pos = ((151 * y + y)) + xStart;
+				myFile.seek(pos);
+				myFile.readBytes(buf, sizeof(buf));
 
-		for (uint8_t i = 0; i < 10; i++)
-		{
-			if (enemies[i].Active == true)
-				if (enemies[i].x == player.x - 1 &&
-					enemies[i].y == player.y)
+				for (byte x = 0; x < sizeof(buf); x++)
 				{
-					return;
+					switch (buf[x])
+					{
+					default:
+						break;
+
+					case 'h':
+					{
+						enemies[eInd].x = x;
+						enemies[eInd].y = y;
+						enemies[eInd].Style = 'h';
+						enemies[eInd].Name = "Alien";
+						enemies[eInd].Active = true;
+						enemies[eInd].Color = PINK;
+						eInd += 1;
+					}
+					break;
+					}
 				}
+			}
 		}
 
-		if (tScreen[player.y][player.x - 1].style != 'b')
-		{
-			player.prevX = player.x;
-			player.prevY = player.y;
-
-			player.x -= 1;
-
-			tft.fillRect(player.prevX * 16, player.prevY * 16, 16, 16, BLACK);
-
-			tft.setTextColor(RED);
-			tft.setCursor(player.x * 16, player.y * 16 + 16);
-			tft.print('a');
-
-			tft.setTextColor(tScreen[player.prevY][player.prevX].color);
-			tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
-			tft.print(tScreen[player.prevY][player.prevX].style);
-		}
+		myFile.close();
 	}
-
-	//MOVE RIGHT
-	if (rightBtn.UpdatePhysicalBtn() == true)
+	else
 	{
-		if (player.x >= xLength - 2)
-		{
-			player.x = 0;
-			xChunk += 1;
-			LoadChunk(xChunk, yChunk);
-			return;
-		}
-
-		for (uint8_t i = 0; i < 10; i++)
-		{
-			if (enemies[i].Active == true)
-				if (enemies[i].x == player.x + 1 &&
-					enemies[i].y == player.y)
-				{
-					return;
-				}
-		}
-
-		if (tScreen[player.y][player.x + 1].style != 'b')
-		{
-			player.prevX = player.x;
-			player.prevY = player.y;
-
-			player.x += 1;
-
-			tft.fillRect(player.prevX * 16, player.prevY * 16, 16, 16, BLACK);
-
-			tft.setTextColor(RED);
-			tft.setCursor(player.x * 16, player.y * 16 + 16);
-			tft.print('a');
-
-			tft.setTextColor(tScreen[player.prevY][player.prevX].color);
-			tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
-			tft.print(tScreen[player.prevY][player.prevX].style);
-		}
+		tft.println("error opening ENS.txt");
 	}
 }
+
+
 
 void Game::CheckTouchScreen()
 {
@@ -874,33 +978,22 @@ void Game::CheckTouchScreen()
 
 		switch (CurrentGameState)
 		{
-		case World:
-		{
-			//myTFTButton.CheckButton(xpos, ypos);
-			/*for (byte i = 0; i < 10; i++)
+			case World:
 			{
-				if (xpos > enemies[i].x * 16 &&
-					xpos < enemies[i].x * 16 + 16 &&
-					ypos > enemies[i].y * 16 &&
-					ypos < enemies[i].y * 16 + 16)
-				{
-					tft.setCursor(enemies[i].x * 16, enemies[i].y * 16 + 16);
-					tft.print('g');
-				}
-			}*/
-		}
-		break;
+				//myTFTButton.CheckButton(xpos, ypos);
+			}
+			break;
 		}
 	}
 	else
 	{
 		switch (CurrentGameState)
 		{
-		case World:
-		{
-			//myTFTButton.pressed = false;
-		}
-		break;
+			case World:
+			{
+				//myTFTButton.pressed = false;
+			}
+			break;
 		}
 	}
 }
