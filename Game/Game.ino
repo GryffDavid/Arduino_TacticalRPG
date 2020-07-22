@@ -2,6 +2,7 @@
 #include <TFTScreen.h>
 #include <TouchScreen.h>
 #include <Fonts/Anims1.h>
+#include <Game.h>
 #include <SPI.h>
 #include <SD.h>
 
@@ -46,89 +47,24 @@ uint8_t Orientation = 1;
 #define GreenYellow     0xAFE5      /* 173, 255,  47 */
 #define Pink            0xF81F
 
-class cBtn
-{
-  public:
-  	cBtn(byte pin) { buttonPin = pin; }
-  
-  	byte buttonPin;
-  	bool buttonState;
-  	bool lastBtnState;
-  	unsigned long lastDebounceTime = 0;
-  	unsigned long debounceDelay = 50;
-};
-
-class Player
-{
-  public:
-    //Position
-    uint16_t x, prevX;
-    byte y, prevY;
-  
-    //Stats
-    byte STR, DEX, CON, INT, WIS, CHA;
-
-    uint16_t money;
-
-    byte MaxHP, CurHP;
-
-    byte Level;
-};
-
-//Enemy for the player to fight
-class Enemy
-{
-  public:
-    uint8_t x;
-    byte y;
-    byte STR, DEX;
-};
-
-//Non-enemy character for the player to interact with. e.g. Shopkeeper, quest giver etc.
-class NPC
-{
-  public:
-    uint8_t x;
-    byte y;
-};
-
-//Items for the player to pick up
-class Item
-{
-  public:
-    uint8_t x;
-    byte y;
-};
-
-class Tile
-{
-  public:
-    uint8_t x;
-    byte y;
-    char style; //The character used to draw the tile from the font
-    uint16_t color; //The colour this tile should be when drawn on screen
-};
-
 
 //Physical buttons
-cBtn topBtn(28);
-cBtn leftBtn(26);
-cBtn rightBtn(30);
-cBtn downBtn(32);
+//cBtn topBtn(28);
+//cBtn leftBtn(26);
+//cBtn rightBtn(30);
+//cBtn downBtn(32);
 
-TFTButton UpButton;
+//TFTButton UpButton;
 
 #define SD_CS 5
 #define xLength 16
 
 String sScreen;
 
-Player player;
+Game Game;
+
 uint16_t xChunk = 0;
 uint16_t yChunk = 0;
-
-enum GameState { World, CharacterScreen, Combat };
-GameState CurrentGameState;
 
 Tile tScreen [15][xLength];
 Enemy enemies[10];
@@ -147,7 +83,7 @@ void setup(void)
     tft.setRotation(Orientation);
     tft.fillScreen(BLACK);  
 
-    CurrentGameState = World;
+    Game.CurrentGameState = World;
     
     bool SDCard = SD.begin(SD_CS);
 
@@ -169,22 +105,12 @@ void setup(void)
     pinMode(53, OUTPUT);
     digitalWrite(53, HIGH);
 
-    pinMode(topBtn.buttonPin, INPUT);
-    pinMode(leftBtn.buttonPin, INPUT);
-    pinMode(rightBtn.buttonPin, INPUT);
-    pinMode(downBtn.buttonPin, INPUT);
-    
-    player.x = 1;
-    player.y = 1;
-
-    player.prevX = 1;
-    player.prevY = 1;    
 
   	tft.setCursor(16, 32);
   	tft.print('a');
 
-    UpButton.InitButton(&tft, 0, 0, 64, 64, WHITE, BLACK, BLACK, "");
-    UpButton.DrawButton();
+    //UpButton.InitButton(&tft, 0, 0, 64, 64, WHITE, BLACK, BLACK, "");
+    
     delay(1000);
 }
 
@@ -198,16 +124,17 @@ void loop()
     pinMode(6, OUTPUT);
     pinMode(7, OUTPUT);
 
-    switch (CurrentGameState)
+    Game.Loop();
+
+    switch (Game.CurrentGameState)
     {
         case World:
         {
             MovePlayer();
         
-          if (UpButton.UpdateTFTButton() == true)
-          {
-            Serial.print("PUSHED!");
-          }
+//          if (UpdateTFTBtn(UpButton) == true)
+//          {
+//          }
         }
         break;
     }
@@ -220,19 +147,18 @@ void loop()
       xpos = map(tp.x, TS_LEFT, TS_RT, 0, tft.width());
       ypos = map(tp.y, TS_TOP, TS_BOT, 0, tft.height());
 
-      switch (CurrentGameState)
+      switch (Game.CurrentGameState)
       {
           case World:
-            UpButton.CheckButton(xpos, ypos);
+            //UpButton.CheckButton(xpos, ypos);
           break;
       }      
     }
     else
     {
-      switch (CurrentGameState)
+      switch (Game.CurrentGameState)
       {
           case World:
-            UpButton.pressed = false;
             //UpButton.CheckButton(-1, -1);
           break;
       }
@@ -243,7 +169,7 @@ void loop()
 void MovePlayer()
 {
   //MOVE UP
-  if (UpdatePhysicalBtn(topBtn) == true)
+  if (Game.topBtn.UpdatePhysicalBtn() == true)
   {            
       if (player.y == 0)
       {
@@ -278,7 +204,7 @@ void MovePlayer()
   }
 
   //MOVE DOWN
-  if (UpdatePhysicalBtn(downBtn) == true)
+  if (Game.downBtn.UpdatePhysicalBtn() == true)
   {
       if (player.y >= 14)
       {
@@ -313,7 +239,7 @@ void MovePlayer()
   }
 
   //MOVE LEFT
-  if (UpdatePhysicalBtn(leftBtn) == true)
+  if (Game.leftBtn.UpdatePhysicalBtn() == true)
   {            
       if (player.x == 0)
       {
@@ -348,7 +274,7 @@ void MovePlayer()
   }
 
   //MOVE RIGHT
-  if (UpdatePhysicalBtn(rightBtn) == true)
+  if (Game.rightBtn.UpdatePhysicalBtn() == true)
   {
       if (player.x >= 14)
       {
@@ -468,26 +394,51 @@ void DrawScreen()
     }
 }
 
-bool UpdatePhysicalBtn(cBtn &button)
+
+bool UpdateTFTBtn(TFTButton &tftBtn)
 {
-	int reading = digitalRead(button.buttonPin);
-	bool result = false;
+  int reading = tftBtn.pressed;
+  bool result = false;
 
-	if (reading != button.lastBtnState)
-	{
-		button.lastDebounceTime = millis();
-	}
+  if (reading != tftBtn.lastButtonState) 
+  {
+    tftBtn.lastDebounceTime = millis();
+  }
 
-	if ((millis() - button.lastDebounceTime) > button.debounceDelay && reading != button.buttonState)
-	{
-		button.buttonState = reading;
-		if (button.buttonState == HIGH)
-		{
-			result = true;
-		}
-	}
-
-	button.lastBtnState = reading;
-	return result;
+  if ((millis() - tftBtn.lastDebounceTime) > tftBtn.debounceDelay && reading != tftBtn.buttonState)
+  {  
+    tftBtn.buttonState = reading;
+    
+    if (tftBtn.buttonState == LOW) 
+    {
+      result = true;
+    }
+  }
+  
+  tftBtn.lastButtonState = reading;
+  return result;
 }
+
+//bool UpdatePhysicalBtn(cBtn &button)
+//{
+//	int reading = digitalRead(button.buttonPin);
+//	bool result = false;
+//
+//	if (reading != button.lastBtnState)
+//	{
+//		button.lastDebounceTime = millis();
+//	}
+//
+//	if ((millis() - button.lastDebounceTime) > button.debounceDelay && reading != button.buttonState)
+//	{
+//		button.buttonState = reading;
+//		if (button.buttonState == HIGH)
+//		{
+//			result = true;
+//		}
+//	}
+//
+//	button.lastBtnState = reading;
+//	return result;
+//}
 
