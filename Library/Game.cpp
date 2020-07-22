@@ -163,47 +163,10 @@ void Game::Init()
 	tft.setRotation(1);
 	tft.fillScreen(BLACK);
 	
-	if (!SD.begin(SD_CS)) 
-	{ 
-		tft.println("SD failed to initialise");
-		while (1);
-	}
-	
-	if (!SD.remove("ENEMIES.txt"))
-	{
-		Serial.println("Error removing file");
-	}
-	else
-	{
-		Serial.println("File removed");
-	}
-	
-	Serial.println("Started copying");
+	//Start the SD card
+	if (!SD.begin(SD_CS)) { tft.println("SD failed to initialise"); while (1); }
 
-	myOrigFile = SD.open("OENEMIES.txt", FILE_READ);
-
-	if (!myOrigFile)
-		Serial.println("Error opening source file");
-	
-
-	myDestFile = SD.open("ENEMIES.txt", FILE_WRITE);
-
-	if (!myDestFile)
-		Serial.println("Error opening destination file");
-	
-
-	size_t n;
-	uint8_t buf[128];
-
-	while ((n = myOrigFile.read(buf, sizeof(buf))) > 0)
-	{
-		myDestFile.write(buf, n);
-		Serial.print('.');
-	}
-
-	myOrigFile.close();
-	myDestFile.close();
-	
+	//CopyFile("OENS.txt", "ENS.txt");
 
 	tft.setCursor(16 * 20 + 16, 16);
 	tft.println("HP: " + (String)player.CurHP + '/' + (String)player.MaxHP);
@@ -229,7 +192,10 @@ void Game::Init()
 	//tft.setCursor(16 * 20 + 16, 64);
 	//tft.print("CHA: " + player.CHA);
 
+	LoadEnemies(xChunk, yChunk);
 	LoadChunk(xChunk, yChunk);
+	
+	DrawEnemies();
 
 	tft.setFont();
 	tft.setTextColor(WHITE);
@@ -274,31 +240,23 @@ void Game::LoadChunk(uint16_t xStart, uint16_t yStart)
 	yStart *= yLength - 1;
 
 	sScreen = "";
-
-	//Should make a copy of enemy/level data first. e.g. Level is a copy of OriginalLevel and Enemies is a copy of OriginalEnemies
-	//So that it's easy to reset data
-
+	
 	//Load Tiles
-	myFile = SD.open("Level.txt");
+	myFile = SD.open("LVL.txt");
 
 	if (myFile)
 	{
-		myFile.seek(0);
 		if (myFile.available())
 		{
-			for (int y = yStart; y < yStart + yLength-1; y++)
+			for (uint8_t y = yStart; y < yStart + yLength-1; y++)
 			{
 				char buf[xLength-1];
 				uint16_t pos = ((151 * y + y)) + xStart;
 				myFile.seek(pos);
-				myFile.readBytes(buf, xLength-1);
+				myFile.readBytes(buf, sizeof(buf));
 				
 				sScreen += buf;
-				sScreen = sScreen.substring(0, sScreen.length() - 1);
 				sScreen += '\n';
-
-				//myFile.seek(pos);
-				//myFile.write("b");
 			}
 		}
 
@@ -306,43 +264,73 @@ void Game::LoadChunk(uint16_t xStart, uint16_t yStart)
 	}
 	else
 	{
-		tft.println("error opening Level.txt");
+		tft.println("error opening LVL.txt");
 	}
 
-
-	////Load enemies
-
-	//When an enemy is destroyed, open the file in WRITE mode and rewrite over the enemy with a tile character
-	
-	//myFile2 = SD.open("Enemies.txt");
-	//if (myFile2)
-	//{
-	//	if (myFile.available())
-	//	{
-	//		for (int y = yStart; y < yStart + yLength - 1; y++)
-	//		{
-	//			char buf[xLength - 1];
-	//			uint16_t pos = ((151) * y + y)) + xStart;
-	//			myFile2.seek(pos);
-	//			myFile2.readBytes(buf, xLength - 1);
-
-	//			for (int i = 0; i < xLength - 1; i++)
-	//			{
-	//				
-	//			}
-
-	//			//DO MORE STUFF. YOU'LL FIGURE IT OUT
-	//		}
-	//	}
-	//}
-
+	LoadEnemies(xStart, yStart);
 
 	tft.fillRect(0, 0, 16 * (xLength-1), 16 * (yLength-1), BLACK);
 	DrawScreen();
+	DrawEnemies();
 
 	tft.setTextColor(RED);
 	tft.setCursor(player.x * 16, player.y * 16 + 16);
 	tft.print('a');
+}
+
+void Game::LoadEnemies(uint16_t xStart, uint16_t yStart)
+{
+	//xStart *= xLength - 1;
+	//yStart *= yLength - 1;
+	for (uint8_t i = 0; i < 10; i++)
+	{
+		enemies[i].Active = false;
+	}
+
+	myFile = SD.open("ENS.txt");
+	uint8_t eInd = 0;
+
+	if (myFile)
+	{
+		if (myFile.available())
+		{
+			for (uint16_t y = yStart; y < yStart + yLength - 1; y++)
+			{
+				char buf[xLength - 1];
+				uint16_t pos = ((151 * y + y)) + xStart;
+				myFile.seek(pos);
+				myFile.readBytes(buf, sizeof(buf));
+				
+				for (uint8_t x = 0; x < sizeof(buf); x++)
+				{
+					switch (buf[x])
+					{
+						default:
+						{
+						}
+						break;
+
+						case 'h':
+						{
+							enemies[eInd].x = x;
+							enemies[eInd].y = y;
+							enemies[eInd].Style = 'h';
+							enemies[eInd].Active = true;
+							enemies[eInd].Color = PINK;
+							eInd += 1;
+						}
+						break;
+					}
+				}
+			}
+		}
+
+		myFile.close();
+	}
+	else
+	{
+		tft.println("error opening ENS.txt");
+	}
 }
 
 void Game::DrawScreen()
@@ -350,9 +338,9 @@ void Game::DrawScreen()
 	tft.setFont(&Anims1);
 	tft.setCursor(0, 16);
 
-	for (int y = 0; y < yLength-1; y++)
+	for (uint16_t y = 0; y < yLength-1; y++)
 	{
-		for (int x = 0; x < xLength; x++)
+		for (uint16_t x = 0; x < xLength; x++)
 		{
 			Tile newTile;
 			newTile.x = x;
@@ -396,6 +384,21 @@ void Game::DrawScreen()
 	}
 }
 
+void Game::DrawEnemies()
+{
+	for (uint8_t i = 0; i < 10; i++)
+	{
+		Serial.println(enemies[i].Active);
+
+		if (enemies[i].Active == true)
+		{
+			tft.setCursor(enemies[i].x * 16, enemies[i].y * 16);
+			tft.setTextColor(enemies[i].Color);
+			tft.print(enemies[i].Style);
+		}
+	}
+}
+
 void Game::MovePlayer()
 {
 	if (aButton.UpdatePhysicalBtn() == true)
@@ -416,9 +419,9 @@ void Game::MovePlayer()
 		Serial.println(deltaX);
 		Serial.println(deltaY);
 
-		uint16_t cols[(int)d];
+		uint16_t cols[(uint16_t)d];
 
-		for (int i = 0; i < (int)abs(deltaX); i++)
+		for (uint16_t i = 0; i < (uint16_t)abs(deltaX); i++)
 		{
 			cols[i] = tft.readPixel((player.x * 16) + 8 + i, (player.y * 16) + 8 + (i * grad));
 			tft.drawPixel((player.x * 16) + 8 + i, (player.y * 16) + 8 + (i*grad), WHITE);
@@ -434,7 +437,7 @@ void Game::MovePlayer()
 		//ReadPixel()
 		
 
-		for (int i = 0; i < (int)abs(deltaX); i++)
+		for (uint16_t i = 0; i < (uint16_t)abs(deltaX); i++)
 		{
 			tft.drawPixel((player.x * 16) + 8 + i, (player.y * 16) + 8 + (i*grad), cols[i]);
 		}
@@ -623,6 +626,37 @@ void Game::CheckTouchScreen()
 		break;
 		}
 	}
+}
+
+void Game::CopyFile(String sourceFile, String destFile)
+{
+	File myOrigFile;
+	File myDestFile;
+	
+	if (!SD.remove(destFile)) { Serial.println("Error removing file"); }
+	else { Serial.println("File removed"); }
+
+	Serial.println("Started copying");
+
+	myOrigFile = SD.open(sourceFile, FILE_READ);
+	if (!myOrigFile)
+		Serial.println("Error opening source file");
+
+	myDestFile = SD.open(destFile, FILE_WRITE);
+	if (!myDestFile)
+		Serial.println("Error opening destination file");
+
+	size_t n;
+	uint8_t buf2[256];
+
+	while ((n = myOrigFile.read(buf2, sizeof(buf2))) > 0)
+	{
+		myDestFile.write(buf2, n);
+		Serial.print('.');
+	}
+
+	myOrigFile.close();
+	myDestFile.close();
 }
 
 

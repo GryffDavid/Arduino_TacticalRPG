@@ -162,7 +162,10 @@ class Game
 		void Loop();
 		void MovePlayer();
 		void LoadChunk(uint16_t xStart, uint16_t yStart);
+		void LoadEnemies(uint16_t xStart, uint16_t yStart);
+		void CopyFile(String sourceFile, String destFile);
 		void DrawScreen();
+		void DrawEnemies();
 		void CheckTouchScreen();
 
 		unsigned long Time;
@@ -175,12 +178,8 @@ class Game
 		TSPoint tp;
 
 		String sScreen;
+
 		File myFile;
-
-		SDFile myOrigFile;
-		SDFile myDestFile;
-
-
 
 		byte xChunk, yChunk;
 
