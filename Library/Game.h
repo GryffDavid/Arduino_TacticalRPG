@@ -46,6 +46,7 @@
 #define BROKEN 64512
 
 enum GameState { Menu, Creator, World, CharacterScreen, Combat };
+enum PlayerState { Normal, SelectMode };
 
 class cBtn
 {
@@ -59,16 +60,44 @@ class cBtn
 		unsigned long debounceDelay = 50;
 };
 
+class Game;
+
+class Selector
+{
+public:
+	Selector();
+	byte _x, _y;
+	bool _active = false;
+	void GetGame(Game *game) { _game = game; };
+	void GetScreen(TFTScreen *screen) { _screen = screen; };
+	void Init(byte xPos, byte yPos, char uChar, uint16_t uColor);
+	void Update(unsigned long elapsed);
+	void Draw();
+	void Undraw();
+	void Move(int xpos, int ypos, char uChar, uint16_t uColor);
+
+private:
+	Game * _game;
+	TFTScreen * _screen;	
+	uint16_t _curTime, _maxTime;
+	uint16_t _color, _uColor;
+	char _uChar;	
+	bool _flash = false; //Whether the selector is drawn or the character underneath
+};
+
 class Explosion
 {
 	public:
 		Explosion();
-		void Init(TFTScreen *screen, byte xPos, byte yPos, char uChar, uint16_t uColor);		
+		void GetGame(Game *game) { _game = game; };
+		void GetScreen(TFTScreen *screen) {	_screen = screen; };
+		void Init(byte xPos, byte yPos, char uChar, uint16_t uColor);		
 		void Update(unsigned long elapsed);
 		void Draw();
 		void Undraw();
 
 	private:
+		Game * _game;
 		TFTScreen * _screen;
 		bool _active = false;
 
@@ -83,28 +112,6 @@ class Explosion
 		byte _x, _y;
 };
 
-class Player
-{
-	public:
-		Player(void);
-
-		//Position
-		byte x, prevX;
-		byte y, prevY;
-
-		//Strength, Perception, Endurance, Charisma, Intelligence, Agility, Luck
-		byte STR, PER, END, CHA, INT, AGI, LUC;
-
-		//http://fallout.wikia.com/wiki/Fallout_2_derived_statistics
-		byte Armor, CritChance, DResist, HealRate, MeleeD, PerkRate, RadResist, Sequence, SkillRate;
-
-		uint16_t money;
-
-		byte MaxHP, CurHP;
-		byte MaxAP, CurAP; //Action points
-		byte Level;
-};
-
 class Enemy
 {
 	public:
@@ -114,9 +121,43 @@ class Enemy
 		byte MaxHP, CurHP;
 		byte MaxAP, CurAP;
 		char Style;
+		String Name;
 		uint16_t Color;
 		bool Active, Targeted;
 };
+
+class Player
+{
+	public:
+		Player(void);
+
+		void SelectEnemy(Enemy *enemy) { _selectedEnemy = enemy; };
+
+		PlayerState PlayerState = Normal;
+
+		//Position
+		byte x, prevX;
+		byte y, prevY;
+
+		//Strength, Perception, Endurance, Charisma, Intelligence, Agility, Luck
+		byte STR, PER, END, CHA, INT, AGI, LUC;
+
+		bool HasTarget;
+
+		//http://fallout.wikia.com/wiki/Fallout_2_derived_statistics
+		byte Armor, CritChance, DResist, HealRate, MeleeD, PerkRate, RadResist, Sequence, SkillRate;
+
+		uint16_t money;
+
+		byte MaxHP, CurHP;
+		byte MaxAP, CurAP; //Action points
+		byte Level;
+
+	private:
+		Enemy * _selectedEnemy;
+};
+
+
 
 class NPC
 {
@@ -153,6 +194,22 @@ class Tile
 		uint16_t color; //The colour this tile should be when drawn on screen
 };
 
+class ActivityFeed
+{
+	public:
+		ActivityFeed();
+		void GetGame(Game *game) { _game = game; };
+		void GetScreen(TFTScreen *screen) { _screen = screen; };
+		void Draw();
+		void Update(String activity);
+		String Lines[4];
+
+	private:
+		TFTScreen * _screen;
+		Game * _game;
+
+};
+
 class Game
 {
 	public:
@@ -160,6 +217,7 @@ class Game
 
 		void Init();
 		void Loop();
+		void Input();
 		void MovePlayer();
 		void LoadChunk(uint16_t xStart, uint16_t yStart);
 		void LoadEnemies(uint16_t xStart, uint16_t yStart);
@@ -177,7 +235,7 @@ class Game
 		TouchScreen ts = TouchScreen(6, A1, A2, 7, 300);
 		TSPoint tp;
 
-		String sScreen;
+		String sScreen, sEnemies;
 
 		File myFile;
 
@@ -186,11 +244,13 @@ class Game
 		GameState CurrentGameState;
 		Player player;
 
-		Tile tScreen[15][xLength];
+		Tile tScreen[yLength][xLength];
 		Enemy enemies[10];
 		Item items[10];
 		NPC npcs[10];
 		Explosion explosion;
+		Selector selector;
+		ActivityFeed activityFeed;
 
 		cBtn topBtn = cBtn(28);
 		cBtn leftBtn = cBtn(26);
@@ -201,5 +261,7 @@ class Game
 		cBtn bButton = cBtn(36);
 	private:
 };
+
+
 
 #endif
