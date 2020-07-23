@@ -123,6 +123,7 @@ void Explosion::Undraw()
 	_screen->setCursor(_x * 16, _y * 16 + 16);
 	_screen->setTextColor(_uColor);
 	_screen->print(_uChar);
+	_game->DrawEnemies();
 }
 
 
@@ -143,6 +144,7 @@ void Selector::Init(byte xPos, byte yPos, char uChar, uint16_t uColor)
 	_active = true;
 	_uChar = uChar;
 	_uColor = uColor;	
+	Draw();
 }
 
 void Selector::Update(unsigned long elapsed)
@@ -262,7 +264,20 @@ Enemy::Enemy(void)
 void Enemy::EndTurn()
 {
 	MyTurn = false;
-	HadTurn = true;
+	_game->DrawEnemies();
+}
+
+void Enemy::StartTurn()
+{
+	MyTurn = true;
+	_game->DrawEnemies();
+}
+
+void Enemy::Undraw()
+{
+	_screen->setCursor(x * 16, y * 16 + 16);
+	_screen->setTextColor(_game->tScreen[y][x].color);
+	_screen->print(_game->tScreen[y][x].style);
 }
 
 
@@ -280,15 +295,17 @@ Player::Player(void)
 
 void Player::EndTurn()
 {
+	_game->activityFeed.Update("Turn Ended");
 	MyTurn = false;
-	HadTurn = true;
+	_game->DrawEnemies();
 }
 
 void Player::StartTurn()
 {
-	HadTurn = false;
+	_game->activityFeed.Update("Turn Started");
 	MyTurn = true;
 	CurAP = MaxAP;
+	_game->DrawEnemies();
 	_game->DrawUI();
 }
 
@@ -326,11 +343,20 @@ void Game::Init()
 	activityFeed.GetGame(this);
 	player.GetGame(this);
 
+
+	//Could almost certainly do this better by making the _game variable static across all instances of enemy
+	for (byte i = 0; i < 10; i++)
+	{
+		enemies[i].GetGame(this);
+		enemies[i].GetScreen(&tft);
+	}
+
 	selector.GetScreen(&tft);
 	explosion.GetScreen(&tft);
 	activityFeed.GetScreen(&tft);
+	
 
-	LoadEnemies(xChunk, yChunk);
+	//LoadEnemies(xChunk, yChunk);
 	LoadChunk(xChunk, yChunk);
 	
 	
@@ -346,202 +372,332 @@ void Game::Loop()
 	ElaspedTime = millis() - Time;
 	Time = millis();
 
-	switch (CurrentGameState)
-	{
-	    case World:
-	    {
-			Input();
-			UpdateEnemies();
+	Input();
+	
+	if (CurrentGameState == Combat)
+		UpdateEnemies();
 
-			explosion.Update(ElaspedTime);
-			selector.Update(ElaspedTime);
-
-			//if (myTFTButton.UpdateTFTButton() == true)
-			//{
-			//		DO STUFF
-			//}
-	    }
-	    break;
-	}
-
+	explosion.Update(ElaspedTime);
+	selector.Update(ElaspedTime);
+	
 	CheckTouchScreen();
 }
 
 void Game::Input()
-{
-	if ((player.PlayerState == Combat && player.CurAP > 0 && player.MyTurn == true) || player.PlayerState == Normal)
+{	
+	switch (CurrentGameState)
 	{
-		MovePlayer();
-	}
-
-	switch (player.PlayerState)
-	{
-	case Normal:
-	{
-		if (aButton.UpdatePhysicalBtn() == true)
+		case World:
 		{
-			//selector.GetGame(this);
-			selector.Init(player.x, player.y, tScreen[player.y][player.x].style, tScreen[player.y][player.x].color);
-
-			for (byte i = 0; i < 10; i++)
+			switch (player.PlayerState)
 			{
-				enemies[i].Targeted = false;
-			}
-
-			player.PlayerState = SelectMode;
-			activityFeed.Update("Select Target");
-		}
-	}
-	break;
-
-	case Combat:
-	{
-		if (player.MyTurn == true && player.CurAP == 0)
-		{
-			player.EndTurn();
-			activityFeed.Update("Turn Ended");
-		}
-
-		if (bButton.UpdatePhysicalBtn() == true)
-		{
-			if (player.CurAP < player.CurrentGun.APCost)
-			{
-				activityFeed.Update("Not enough action points");
-			}
-
-			if (player.HasTarget == true && player.CurAP >= player.CurrentGun.APCost)
-			{
-				player.CurAP -= player.CurrentGun.APCost;
-				DrawUI();
-
-				double deltaX = (player.x * 16 + 8) - (160 + 8); //X Change
-				double deltaY = (player.y * 16 + 8) - (160 + 8); //Y Change
-
-				double grad = (double)deltaY / (double)deltaX;
-				double d = sqrt((deltaX * deltaX) + (deltaY * deltaY));
-
-				Serial.println(grad);
-				Serial.println(d);
-				Serial.println(deltaX);
-				Serial.println(deltaY);
-
-				uint16_t cols[(uint16_t)d];
-
-				for (uint16_t i = 0; i < (uint16_t)abs(deltaX); i++)
+				case Normal:
 				{
-					cols[i] = tft.readPixel((player.x * 16) + 8 + i, (player.y * 16) + 8 + (i * grad));
-					tft.drawPixel((player.x * 16) + 8 + i, (player.y * 16) + 8 + (i*grad), WHITE);
+					MovePlayer();
+
+					//Enter targeting mode
+					if (aButton.UpdatePhysicalBtn() == true)
+					{
+						selector.Init(player.x, player.y, tScreen[player.y][player.x].style, tScreen[player.y][player.x].color);
+
+						for (byte i = 0; i < 10; i++)
+						{
+							enemies[i].Targeted = false;
+						}
+
+						player.PlayerState = TargetMode;
+						activityFeed.Update("Select Target");
+					}				
 				}
+				break;
 
-				explosion.Init(selector._x, selector._y, tScreen[selector._y][selector._x].style, tScreen[selector._y][selector._x].color);
-
-				//Read and store the colour of all the pixels in the line,
-				//Then draw the white line
-				//Wait, then draw the colour of the original pixels back again
-				//ReadPixel()
-
-
-				for (uint16_t i = 0; i < (uint16_t)abs(deltaX); i++)
+				case TargetMode:
 				{
-					tft.drawPixel((player.x * 16) + 8 + i, (player.y * 16) + 8 + (i*grad), cols[i]);
+					//Cancel Targeting
+					if (aButton.UpdatePhysicalBtn() == true)
+					{
+						player.PlayerState = Normal;
+						selector._active = false;
+						selector.Undraw();
+						activityFeed.Update("Targeting cancelled");
+						player.HasTarget = false;
+						return;
+					}
+
+					//Select Target
+					if (bButton.UpdatePhysicalBtn() == true)
+					{
+						bool foundTarget = false;
+
+						for (byte i = 0; i < 10; i++)
+						{
+							if (enemies[i].x == selector._x &&
+								enemies[i].y == selector._y)
+							{
+								activityFeed.Update("Target selected: " + enemies[i].Name);
+								CurrentGameState = Combat;
+								activityFeed.Update("Entered combat");
+								player.MyTurn = true;
+								enemies[i].Targeted = true;
+								player.HasTarget = true;
+								foundTarget = true;
+								player.SelectEnemy(&enemies[i]);
+							}
+						}
+
+						if (foundTarget == false)
+						{
+							player.HasTarget = false;
+							activityFeed.Update("No target selected");
+						}
+
+						selector._active = false;
+						selector.Undraw();						
+						player.PlayerState = Normal;
+					}
+
+					//Move reticle
+					if (rightBtn.UpdatePhysicalBtn() == true)
+					{
+						selector.Move(1, 0, tScreen[selector._y][selector._x + 1].style, tScreen[selector._y][selector._x + 1].color);
+					}
+
+					if (leftBtn.UpdatePhysicalBtn() == true)
+					{
+						selector.Move(-1, 0, tScreen[selector._y][selector._x - 1].style, tScreen[selector._y][selector._x - 1].color);
+					}
+
+					if (topBtn.UpdatePhysicalBtn() == true)
+					{
+						selector.Move(0, -1, tScreen[selector._y - 1][selector._x].style, tScreen[selector._y - 1][selector._x].color);
+					}
+
+					if (downBtn.UpdatePhysicalBtn() == true)
+					{
+						selector.Move(0, 1, tScreen[selector._y + 1][selector._x].style, tScreen[selector._y + 1][selector._x].color);
+					}
 				}
-
-				activityFeed.Update("Fired shot");
-
-				//for (int x = player.x; x < 10; x++)
-				//{
-				//	uint16_t blockX = x;
-				//	uint16_t blockY = player.y + (x * grad);
-
-				//	tft.fillRect(blockX * 16, blockY * 16 - 16, 16, 16, BLACK);
-				//	tft.setCursor(blockX * 16, blockY * 16 + 16);
-				//	tft.setTextColor(tScreen[blockY][blockX].color);
-				//	tft.print(tScreen[blockY][blockX].style);
-				//}
-
-
-				//tft.fillRect(x * 16, y * 16, 16, 16, BLACK);
-				//tft.setCursor(x * 16, y * 16);
-				//tft.setTextColor(tScreen[y][x].color);
-				//tft.print(tScreen[y][x].style);
-
-
-				//Calculate which blocks it intersected along the path
-				//Redraw those blocks when necessary?
-				//Also solid blocks need to stop shots
-
-				//Could also change to black screen for combat and make things easier
-				return;
+				break;
 			}
 		}
-	}
-	break;
+		break;
 
-	case SelectMode:
-	{
-		if (aButton.UpdatePhysicalBtn() == true)
+		case Combat:
 		{
-			player.PlayerState = Normal;
-			selector._active = false;
-			selector.Undraw();
-			activityFeed.Update("Targeting cancelled");
-			player.HasTarget = false;
-			return;
-		}
-
-		if (bButton.UpdatePhysicalBtn() == true)
-		{
-			player.PlayerState = Normal;
-			bool foundTarget = false;
-
-			for (byte i = 0; i < 10; i++)
+			switch (player.PlayerState)
 			{
-				if (enemies[i].x == selector._x &&
-					enemies[i].y == selector._y)
+				case Normal:
 				{
-					activityFeed.Update("Target selected: " + enemies[i].Name);
-					player.PlayerState = Combat;
-					activityFeed.Update("Entered combat");
-					player.MyTurn = true;
-					enemies[i].Targeted = true;
-					player.HasTarget = true;
-					foundTarget = true;
-					player.SelectEnemy(&enemies[i]);
+					if (player.MyTurn == true && player.CurAP > 0)
+					{
+						MovePlayer();
+					}
+
+					//Enter targeting mode
+					if (aButton.UpdatePhysicalBtn() == true)
+					{
+						selector.Init(player.x, player.y, tScreen[player.y][player.x].style, tScreen[player.y][player.x].color);
+
+						for (byte i = 0; i < 10; i++)
+						{
+							enemies[i].Targeted = false;
+						}
+
+						player.PlayerState = TargetMode;
+						activityFeed.Update("Select Target");
+					}
+
+					//Pressed B button
+					if (bButton.UpdatePhysicalBtn() == true)
+					{
+						if (player.CurAP < player.CurrentGun.APCost)
+						{
+							activityFeed.Update("Not enough action points");
+						}
+
+						if (player.HasTarget == true && player.CurAP >= player.CurrentGun.APCost)
+						{
+							player.CurAP -= player.CurrentGun.APCost;
+							DrawUI();
+
+							double deltaX = (player.x * 16 + 8) - (160 + 8); //X Change
+							double deltaY = (player.y * 16 + 8) - (160 + 8); //Y Change
+
+							double grad = (double)deltaY / (double)deltaX;
+							double d = sqrt((deltaX * deltaX) + (deltaY * deltaY));
+							
+							uint16_t cols[(uint16_t)d];
+
+							for (uint16_t i = 0; i < (uint16_t)abs(deltaX); i++)
+							{
+								cols[i] = tft.readPixel((player.x * 16) + 8 + i, (player.y * 16) + 8 + (i * grad));
+								tft.drawPixel((player.x * 16) + 8 + i, (player.y * 16) + 8 + (i*grad), WHITE);
+							}
+
+							explosion.Init(selector._x, selector._y, tScreen[selector._y][selector._x].style, tScreen[selector._y][selector._x].color);
+
+							//Read and store the colour of all the pixels in the line,
+							//Then draw the white line
+							//Wait, then draw the colour of the original pixels back again
+							//ReadPixel()
+
+
+							for (uint16_t i = 0; i < (uint16_t)abs(deltaX); i++)
+							{
+								tft.drawPixel((player.x * 16) + 8 + i, (player.y * 16) + 8 + (i*grad), cols[i]);
+							}
+							
+							
+
+							//for (int x = player.x; x < 10; x++)
+							//{
+							//	uint16_t blockX = x;
+							//	uint16_t blockY = player.y + (x * grad);
+
+							//	tft.fillRect(blockX * 16, blockY * 16 - 16, 16, 16, BLACK);
+							//	tft.setCursor(blockX * 16, blockY * 16 + 16);
+							//	tft.setTextColor(tScreen[blockY][blockX].color);
+							//	tft.print(tScreen[blockY][blockX].style);
+							//}
+
+
+							//tft.fillRect(x * 16, y * 16, 16, 16, BLACK);
+							//tft.setCursor(x * 16, y * 16);
+							//tft.setTextColor(tScreen[y][x].color);
+							//tft.print(tScreen[y][x].style);
+
+
+							//Calculate which blocks it intersected along the path
+							//Redraw those blocks when necessary?
+							//Also solid blocks need to stop shots
+
+							uint16_t ND, RD;
+
+							RD = random(player.CurrentGun.MinDamage, player.CurrentGun.MaxDamage);
+							ND = RD;
+
+							player._selectedEnemy->CurHP -= ND;
+							activityFeed.Update("Fired shot. Hit " + player._selectedEnemy->Name + " for " + ND);
+
+							if (player._selectedEnemy->CurHP <= 0)
+							{
+								player._selectedEnemy->Active = false;
+								player._selectedEnemy->Undraw();
+								activityFeed.Update(player._selectedEnemy->Name + " was killed");
+							}
+							else
+							{
+								activityFeed.Update(player._selectedEnemy->Name + " has " + player._selectedEnemy->CurHP + " remaining");
+							}
+
+							//If enemy dies, select next enemy? Or deselect completely
+							//player.HasTarget = false;
+							//player._selectedEnemy->Active = false;
+							
+		/*					bool ActiveEnemies = false;
+
+							for (byte i = 0; i < 10; i++)
+							{
+								if (enemies[i].Active == true)
+								{
+									ActiveEnemies = true;
+									break;
+								}
+							}
+
+							if (ActiveEnemies == false)
+							{
+								player.HasTarget = false;
+								player.CurAP = player.MaxAP;
+								DrawUI();
+								activityFeed.Update("Combat Ended");
+								player.PlayerState = Normal;
+								CurrentGameState = World;
+								return;
+							}*/
+
+							//Could also change to black screen for combat and make things easier				
+							return;
+						}
+					}
+
+					//Ran out of moves - Wait for animations to finish before ending turn
+					if (player.MyTurn == true && player.CurAP == 0 && explosion._active == false)
+					{
+						player.EndTurn();
+					}
 				}
+				break;
+
+				case TargetMode:
+				{
+					//Cancel Targeting
+					if (aButton.UpdatePhysicalBtn() == true)
+					{
+						player.PlayerState = Normal;
+						selector._active = false;
+						selector.Undraw();
+						activityFeed.Update("Targeting cancelled");
+						player.HasTarget = false;
+						return;
+					}
+
+					//Select Target
+					if (bButton.UpdatePhysicalBtn() == true)
+					{
+						bool foundTarget = false;
+
+						for (byte i = 0; i < 10; i++)
+						{
+							if (enemies[i].x == selector._x &&
+								enemies[i].y == selector._y)
+							{
+								activityFeed.Update("Target selected: " + enemies[i].Name);
+								enemies[i].Targeted = true;
+								player.HasTarget = true;
+								foundTarget = true;
+								player.SelectEnemy(&enemies[i]);
+							}
+						}
+
+						if (foundTarget == false)
+						{
+							player.HasTarget = false;
+							activityFeed.Update("No target selected");
+						}
+
+						selector._active = false;
+						selector.Undraw();
+						player.PlayerState = Normal;
+					}
+
+					//Move reticle
+					if (rightBtn.UpdatePhysicalBtn() == true)
+					{
+						selector.Move(1, 0, tScreen[selector._y][selector._x + 1].style, tScreen[selector._y][selector._x + 1].color);
+					}
+
+					if (leftBtn.UpdatePhysicalBtn() == true)
+					{
+						selector.Move(-1, 0, tScreen[selector._y][selector._x - 1].style, tScreen[selector._y][selector._x - 1].color);
+					}
+
+					if (topBtn.UpdatePhysicalBtn() == true)
+					{
+						selector.Move(0, -1, tScreen[selector._y - 1][selector._x].style, tScreen[selector._y - 1][selector._x].color);
+					}
+
+					if (downBtn.UpdatePhysicalBtn() == true)
+					{
+						selector.Move(0, 1, tScreen[selector._y + 1][selector._x].style, tScreen[selector._y + 1][selector._x].color);
+					}				
+				}
+				break;
 			}
-
-			if (foundTarget == false)
-			{
-				player.HasTarget = false;
-				activityFeed.Update("No target selected");
-			}
-
-			selector._active = false;
-			selector.Undraw();
 		}
-
-		if (rightBtn.UpdatePhysicalBtn() == true)
-		{
-			selector.Move(1, 0, tScreen[selector._y][selector._x + 1].style, tScreen[selector._y][selector._x + 1].color);
-		}
-
-		if (leftBtn.UpdatePhysicalBtn() == true)
-		{
-			selector.Move(-1, 0, tScreen[selector._y][selector._x - 1].style, tScreen[selector._y][selector._x - 1].color);
-		}
-
-		if (topBtn.UpdatePhysicalBtn() == true)
-		{
-			selector.Move(0, -1, tScreen[selector._y - 1][selector._x].style, tScreen[selector._y - 1][selector._x].color);
-		}
-
-		if (downBtn.UpdatePhysicalBtn() == true)
-		{
-			selector.Move(0, 1, tScreen[selector._y + 1][selector._x].style, tScreen[selector._y + 1][selector._x].color);
-		}
+		break;
 	}
-	break;
-	}
+
 }
 
 void Game::MovePlayer()
@@ -549,20 +705,26 @@ void Game::MovePlayer()
 	//MOVE UP
 	if (topBtn.UpdatePhysicalBtn() == true)
 	{
-		if (player.PlayerState == Combat)
-		{
-			player.CurAP--;
-			DrawUI();
-		}
-
+		//Load new Chunk if necessary
 		if (player.y == 0)
 		{
+			if (CurrentGameState == Combat)
+				return;
+
 			player.y = yLength - 2;
 			yChunk -= 1;
 			LoadChunk(xChunk, yChunk);
 			return;
 		}
 
+		//Use APs if in Combat
+		if (CurrentGameState == Combat)
+		{
+			player.CurAP--;
+			DrawUI();
+		}
+
+		//Bump into enemies
 		for (uint8_t i = 0; i < 10; i++)
 		{
 			if (enemies[i].Active == true)
@@ -573,6 +735,7 @@ void Game::MovePlayer()
 				}
 		}
 
+		//Actually move player
 		if (tScreen[player.y - 1][player.x].style != 'b')
 		{
 			player.prevX = player.x;
@@ -590,25 +753,32 @@ void Game::MovePlayer()
 			tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
 			tft.print(tScreen[player.prevY][player.prevX].style);
 		}
+		return;
 	}
 
 	//MOVE DOWN
 	if (downBtn.UpdatePhysicalBtn() == true)
 	{
-		if (player.PlayerState == Combat)
-		{
-			player.CurAP--;
-			DrawUI();
-		}
-
+		//Load new Chunk if necessary
 		if (player.y >= yLength - 2)
 		{
+			if (CurrentGameState == Combat)
+				return;
+
 			player.y = 0;
 			yChunk += 1;
 			LoadChunk(xChunk, yChunk);
 			return;
 		}
 
+		//Use APs if in Combat
+		if (CurrentGameState == Combat)
+		{
+			player.CurAP--;
+			DrawUI();
+		}
+
+		//Bump into enemies
 		for (uint8_t i = 0; i < 10; i++)
 		{
 			if (enemies[i].Active == true)
@@ -619,6 +789,7 @@ void Game::MovePlayer()
 				}
 		}
 
+		//Actually move player
 		if (tScreen[player.y + 1][player.x].style != 'b')
 		{
 			player.prevX = player.x;
@@ -636,25 +807,32 @@ void Game::MovePlayer()
 			tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
 			tft.print(tScreen[player.prevY][player.prevX].style);
 		}
+		return;
 	}
 
 	//MOVE LEFT
 	if (leftBtn.UpdatePhysicalBtn() == true)
 	{
-		if (player.PlayerState == Combat)
-		{
-			player.CurAP--;
-			DrawUI();
-		}
-
+		//Load new Chunk if necessary
 		if (player.x == 0)
 		{
+			if (CurrentGameState == Combat)
+				return;
+
 			player.x = xLength - 2;
 			xChunk -= 1;
 			LoadChunk(xChunk, yChunk);
 			return;
 		}
 
+		//Use APs if in Combat
+		if (CurrentGameState == Combat)
+		{
+			player.CurAP--;
+			DrawUI();
+		}
+
+		//Bump into enemies
 		for (uint8_t i = 0; i < 10; i++)
 		{
 			if (enemies[i].Active == true)
@@ -665,6 +843,7 @@ void Game::MovePlayer()
 				}
 		}
 
+		//Actually move player
 		if (tScreen[player.y][player.x - 1].style != 'b')
 		{
 			player.prevX = player.x;
@@ -682,35 +861,43 @@ void Game::MovePlayer()
 			tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
 			tft.print(tScreen[player.prevY][player.prevX].style);
 		}
+		return;
 	}
 
 	//MOVE RIGHT
 	if (rightBtn.UpdatePhysicalBtn() == true)
 	{
-		if (player.PlayerState == Combat)
-		{
-			player.CurAP--;
-			DrawUI();
-		}
-
+		//Load new Chunk if necessary
 		if (player.x >= xLength - 2)
 		{
+			if (CurrentGameState == Combat)
+				return;
+
 			player.x = 0;
 			xChunk += 1;
 			LoadChunk(xChunk, yChunk);
 			return;
 		}
 
+		//Use APs if in Combat
+		if (CurrentGameState == Combat)
+		{
+			player.CurAP--;
+			DrawUI();
+		}
+		
+		//Bump into enemies
 		for (uint8_t i = 0; i < 10; i++)
 		{
 			if (enemies[i].Active == true)
-				if (enemies[i].x == player.x + 1 &&
-					enemies[i].y == player.y)
+			if (enemies[i].x == player.x + 1 &&
+				enemies[i].y == player.y)
 				{
 					return;
 				}
 		}
 
+		//Actually move player
 		if (tScreen[player.y][player.x + 1].style != 'b')
 		{
 			player.prevX = player.x;
@@ -728,6 +915,7 @@ void Game::MovePlayer()
 			tft.setCursor(player.prevX * 16, player.prevY * 16 + 16);
 			tft.print(tScreen[player.prevY][player.prevX].style);
 		}
+		return;
 	}
 }
 
@@ -807,8 +995,10 @@ void Game::DrawEnemies()
 		{
 			tft.setCursor(enemies[i].x * 16, enemies[i].y * 16 + 16);
 
-			if (enemies[i].Targeted == true)
+			if (player.MyTurn == true && enemies[i].Targeted == true)
 				tft.setTextColor(RED);
+			else if (player.MyTurn == false && enemies[i].MyTurn == true)
+				tft.setTextColor(GREEN);
 			else
 				tft.setTextColor(enemies[i].Color);
 
@@ -819,20 +1009,47 @@ void Game::DrawEnemies()
 
 void Game::UpdateEnemies()
 {
-	for (byte i = 0; i < 10; i++)
+	if (player.MyTurn == false)
 	{
-		if (enemies[i].Active == true && player.MyTurn == false && player.HadTurn == true)
+		bool ActiveEnemies = false;
+
+		for (byte i = 0; i < 10; i++)
 		{
-			enemies[i].MyTurn = true;
-			//Attack player
-			//Add pauses in between so that the turn isn't over in 30 milliseconds
-			enemies[i].EndTurn();
+			if (enemies[i].Active == true)
+			{
+				if (enemies[i].CurHP <= 0)
+				{
+					enemies[i].Active = false;
+					enemies[i].Undraw();
+				}
+				else
+				{
+					ActiveEnemies = true;
+					enemies[i].StartTurn();
+					activityFeed.Update(enemies[i].Name + " " + i + " Turn");
+					delay(1000);
+					//Attack player
+					//Add pauses in between so that the turn isn't over in 30 milliseconds
+					enemies[i].EndTurn();
+				}
+			}
 		}
 
-		if (player.HadTurn == true && player.MyTurn == false)
+		if (ActiveEnemies == false)
+		{			
+			player.HasTarget = false;			
+			player.CurAP = player.MaxAP;
+			DrawUI();
+			activityFeed.Update("Combat Ended");
+			player.PlayerState = Normal;
+			CurrentGameState = World;
+			return;
+		}
+
+		//Every enemy has had a turn. Player's turn now
+		if (player.MyTurn == false)
 		{
 			player.StartTurn();
-			activityFeed.Update("Turn Started");
 		}
 	}
 }
@@ -849,13 +1066,17 @@ void Game::LoadPlayer()
 	player.AGI = 5;
 	player.LUC = 5;
 
+	player.ArmorClass = player.AGI;
+
 	player.MaxAP = (int)(5 / 2) + 5;
 	player.CurAP = player.MaxAP;
-
+	
 	Gun tmpGun;
 	tmpGun.APCost = 5;
-	tmpGun.Damage = 10;
+	tmpGun.MaxDamage = 15;
+	tmpGun.MinDamage = 10;
 	player.CurrentGun = tmpGun;
+	player.PlayerState = Normal;
 }
 
 void Game::LoadChunk(uint16_t xStart, uint16_t yStart)
@@ -934,12 +1155,17 @@ void Game::LoadEnemies(uint16_t xStart, uint16_t yStart)
 
 					case 'h':
 					{
-						enemies[eInd].x = x;
-						enemies[eInd].y = y;
-						enemies[eInd].Style = 'h';
-						enemies[eInd].Name = "Alien";
-						enemies[eInd].Active = true;
-						enemies[eInd].Color = PINK;
+						Enemy *tmp = &enemies[eInd];
+						tmp->x = x;
+						tmp->y = y;
+						tmp->MaxHP = 23;
+						tmp->CurHP = tmp->MaxHP;
+						tmp->MaxAP = 5;
+						tmp->CurAP = tmp->MaxAP;
+						tmp->Style = 'h';
+						tmp->Name = "Alien";
+						tmp->Active = true;
+						tmp->Color = PINK;
 						eInd += 1;
 					}
 					break;

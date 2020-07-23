@@ -45,8 +45,8 @@
 
 #define BROKEN 64512
 
-enum GameState { Menu, Creator, World, CharacterScreen, VATS };
-enum PlayerState { Normal, SelectMode, Combat };
+enum GameState { World, Combat };
+enum PlayerState { Normal, TargetMode };
 
 class cBtn
 {
@@ -78,7 +78,7 @@ class MeleeWeapon
 class Gun
 {
 	public:
-		byte ReloadAP, Range, Damage, APCost, Magazine;
+		byte ReloadAP, Range, MaxDamage, MinDamage, APCost, Magazine;
 		char Style; //The character to represent this weapon in menus etc
 };
 
@@ -114,12 +114,12 @@ class Explosion
 		void Init(byte xPos, byte yPos, char uChar, uint16_t uColor);		
 		void Update(unsigned long elapsed);
 		void Draw();
+		bool _active = false;
 		void Undraw();		
 
 	private:
 		Game * _game;
-		TFTScreen * _screen;
-		bool _active = false;
+		TFTScreen * _screen;		
 
 		char _curChar;
 
@@ -136,18 +136,25 @@ class Enemy
 {
 	public:
 		Enemy(void);
+		void GetGame(Game *game) { _game = game; };
+		void GetScreen(TFTScreen *screen) { _screen = screen; };
 		void EndTurn();
-		void StartTurn();
+		void StartTurn();		
+		void Undraw();
 		byte x, y;
 		byte STR, DEX;
-		byte MaxHP, CurHP;
+		int16_t MaxHP, CurHP;
 		byte MaxAP, CurAP;
 		char Style;
 		String Name;
 		uint16_t Color;
 		bool Active, Targeted;
 		bool MyTurn = false;
-		bool HadTurn = false;
+
+	private:
+		Game * _game;
+		TFTScreen * _screen;
+		
 };
 
 class Player
@@ -175,7 +182,7 @@ class Player
 		bool HasTarget;
 
 		//http://fallout.wikia.com/wiki/Fallout_2_derived_statistics
-		byte Armor, CritChance, DResist, HealRate, MeleeD, PerkRate, RadResist, Sequence, SkillRate;
+		byte ArmorClass, CritChance, DResist, HealRate, MeleeD, PerkRate, RadResist, Sequence, SkillRate;
 
 		uint16_t money;
 
@@ -184,10 +191,9 @@ class Player
 		byte Level;
 
 		bool MyTurn = false;
-		bool HadTurn = false;
-
-	private:
 		Enemy * _selectedEnemy;
+	private:
+		
 		Game * _game;
 };
 
@@ -239,7 +245,7 @@ class Game
 		void LoadEnemies(uint16_t xStart, uint16_t yStart);
 		void CopyFile(String sourceFile, String destFile);
 		void DrawScreen();
-		void  DrawUI();
+		void DrawUI();
 		void UpdateEnemies();
 		void DrawEnemies();
 		void CheckTouchScreen();
