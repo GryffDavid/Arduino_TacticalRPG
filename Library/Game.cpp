@@ -413,19 +413,6 @@ bool Player::CanHit()
 }
 
 
-Pathfinder::Pathfinder()
-{
-}
-
-void Pathfinder::Init()
-{
-	SearchNode *node1 = new SearchNode();
-	node1->x = 10;
-	node1->y = 10;
-	node1->DistToGoal = 5;
-	OpenList.add(node1);	
-}
-
 
 Game::Game()
 {
@@ -459,14 +446,7 @@ void Game::Init()
 	explosion.GetGame(this);
 	activityFeed.GetGame(this);
 	player.GetGame(this);
-
-	pFinder.Init();
 	
-	for (int i = 0; i < pFinder.OpenList.size(); i++)
-	{
-		Serial.println(pFinder.OpenList.get(i)->x);
-	}
-
 
 	//Could almost certainly do this better by making the _game variable static across all instances of enemy
 	for (byte i = 0; i < 10; i++)
@@ -867,7 +847,8 @@ void Game::MovePlayer()
 		}
 
 		//Actually move player
-		if (tScreen[player.y - 1][player.x].style != 'b')
+		if (tScreen[player.y - 1][player.x].style != 'b' && 
+			tScreen[player.y - 1][player.x].style != 'm')
 		{
 			player.prevX = player.x;
 			player.prevY = player.y;
@@ -921,7 +902,8 @@ void Game::MovePlayer()
 		}
 
 		//Actually move player
-		if (tScreen[player.y + 1][player.x].style != 'b')
+		if (tScreen[player.y + 1][player.x].style != 'b' &&
+			tScreen[player.y + 1][player.x].style != 'm')
 		{
 			player.prevX = player.x;
 			player.prevY = player.y;
@@ -975,7 +957,8 @@ void Game::MovePlayer()
 		}
 
 		//Actually move player
-		if (tScreen[player.y][player.x - 1].style != 'b')
+		if (tScreen[player.y][player.x - 1].style != 'b' &&
+			tScreen[player.y][player.x - 1].style != 'm')
 		{
 			player.prevX = player.x;
 			player.prevY = player.y;
@@ -1029,7 +1012,8 @@ void Game::MovePlayer()
 		}
 
 		//Actually move player
-		if (tScreen[player.y][player.x + 1].style != 'b')
+		if (tScreen[player.y][player.x + 1].style != 'b' &&
+			tScreen[player.y][player.x + 1].style != 'm')
 		{
 			player.prevX = player.x;
 			player.prevY = player.y;

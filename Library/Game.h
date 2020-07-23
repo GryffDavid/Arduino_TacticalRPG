@@ -48,7 +48,6 @@
 
 enum GameState { World, Combat };
 enum PlayerState { Normal, TargetMode };
-
 enum GunType { Small, Big, Energy };
 
 struct SearchNode
@@ -91,22 +90,6 @@ class Gun
 		byte ReloadAP, Range, MaxDamage, MinDamage, APCost, Magazine;
 		char Style; //The character to represent this weapon in menus etc
 		GunType GunType;
-};
-
-class Pathfinder
-{
-	public:
-		Pathfinder();
-		LinkedList<SearchNode*> OpenList = LinkedList<SearchNode*>();
-		LinkedList<SearchNode*> ClosedList = LinkedList<SearchNode*>();
-		void Init();
-		void GetGame(Game *game) { _game = game; };
-		bool FindPath = true; //Whether a path needs to be found still
-		void DoSearchStep();
-		void SelectNodeToVisit();
-		
-	private:
-		Game * _game;
 };
 
 class Selector
@@ -292,9 +275,7 @@ class Game
 		void UpdateEnemies();
 		void DrawEnemies();
 		void CheckTouchScreen();
-
-		Pathfinder pFinder;
-
+		
 		unsigned long Time;
 		unsigned long ElaspedTime;
 
