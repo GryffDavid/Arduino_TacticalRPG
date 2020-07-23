@@ -8,7 +8,6 @@
 #include <SD.h>
 #include <Adafruit_GFX.h>
 #include <Fonts/Anims1.h>
-#include <LinkedList.h>
 
 #define MINPRESSURE 20
 #define MAXPRESSURE 1000
@@ -163,9 +162,6 @@ class Enemy
 		int16_t MaxHP, CurHP;
 		byte MaxAP, CurAP;		
 		
-		
-		
-
 	private:
 		Game * _game;
 		TFTScreen * _screen;
@@ -302,13 +298,13 @@ class Game
 		Selector selector;
 		ActivityFeed activityFeed;
 
-		cBtn topBtn = cBtn(28);
-		cBtn leftBtn = cBtn(26);
-		cBtn rightBtn = cBtn(30);
-		cBtn downBtn = cBtn(32);
+		cBtn topBtn = cBtn(35);
+		cBtn leftBtn = cBtn(49);
+		cBtn rightBtn = cBtn(43);
+		cBtn downBtn = cBtn(41);
 
-		cBtn aButton = cBtn(34);
-		cBtn bButton = cBtn(36);		
+		cBtn aButton = cBtn(45);
+		cBtn bButton = cBtn(47);		
 	private:
 };
 

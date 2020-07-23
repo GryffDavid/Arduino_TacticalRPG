@@ -1,6 +1,3 @@
-#define SUPPORT_8352B
-#define OFFSET_9327 32             //costs about 103 bytes, 0.08s
-
 #include "TFTScreen.h"
 #include "TFTScreen_shield.h"
 
@@ -72,7 +69,6 @@ static inline void WriteCmdParam4(uint8_t cmd, uint8_t d1, uint8_t d2, uint8_t d
 	WriteCmdParamN(cmd, 4, d);
 }
 
-//#define WriteCmdParam4(cmd, d1, d2, d3, d4) {uint8_t d[4];d[0] = d1, d[1] = d2, d[2] = d3, d[3] = d4;WriteCmdParamN(cmd, 4, d);}
 void TFTScreen::pushCommand(uint16_t cmd, uint8_t * block, int8_t N)
 {
 	WriteCmdParamN(cmd, N, block);
@@ -142,7 +138,6 @@ uint16_t TFTScreen::readID(void)
 	return 0x9327;
 }
 
-// independent cursor and window registers.   S6D0154, ST7781 increments.  ILI92320/5 do not.  
 int16_t TFTScreen::readGRAM(int16_t x, int16_t y, uint16_t * block, int16_t w, int16_t h)
 {
 	uint16_t ret, dummy, _MR = _MW;
@@ -179,6 +174,7 @@ int16_t TFTScreen::readGRAM(int16_t x, int16_t y, uint16_t * block, int16_t w, i
 		{
 			READ_16(dummy);
 		}
+
 		if (_lcd_ID == 0x1511)
 			READ_8(r);   //extra dummy for R61511
 
@@ -240,18 +236,18 @@ void TFTScreen::setRotation(uint8_t r)
 
 	switch (rotation)
 	{
-	case 0:                    //PORTRAIT:
-		val = 0x48;             //MY=0, MX=1, MV=0, ML=0, BGR=1
-		break;
-	case 1:                    //LANDSCAPE: 90 degrees
-		val = 0x28;             //MY=0, MX=0, MV=1, ML=0, BGR=1
-		break;
-	case 2:                    //PORTRAIT_REV: 180 degrees
-		val = 0x88;             //MY=1, MX=0, MV=0, ML=1, BGR=1
-		break;
-	case 3:                    //LANDSCAPE_REV: 270 degrees
-		val = 0xF8;             //MY=1, MX=1, MV=1, ML=1, BGR=1
-		break;
+		case 0:                    //PORTRAIT:
+			val = 0x48;             //MY=0, MX=1, MV=0, ML=0, BGR=1
+			break;
+		case 1:                    //LANDSCAPE: 90 degrees
+			val = 0x28;             //MY=0, MX=0, MV=1, ML=0, BGR=1
+			break;
+		case 2:                    //PORTRAIT_REV: 180 degrees
+			val = 0x88;             //MY=1, MX=0, MV=0, ML=1, BGR=1
+			break;
+		case 3:                    //LANDSCAPE_REV: 270 degrees
+			val = 0xF8;             //MY=1, MX=1, MV=1, ML=1, BGR=1
+			break;
 	}
 
 	if (_lcd_capable & INVERT_GS)
@@ -265,11 +261,11 @@ void TFTScreen::setRotation(uint8_t r)
 
 	if (_lcd_capable & MIPI_DCS_REV1)
 	{
-	common_MC:
-		_MC = 0x2A, _MP = 0x2B, _MW = 0x2C, _SC = 0x2A, _EC = 0x2A, _SP = 0x2B, _EP = 0x2B;
-	common_BGR:
-		WriteCmdParamN(is8347 ? 0x16 : 0x36, 1, &val);
-		_lcd_madctl = val;
+		common_MC:
+			_MC = 0x2A, _MP = 0x2B, _MW = 0x2C, _SC = 0x2A, _EC = 0x2A, _SP = 0x2B, _EP = 0x2B;
+		common_BGR:
+			WriteCmdParamN(is8347 ? 0x16 : 0x36, 1, &val);
+			_lcd_madctl = val;
 	}
 
 	if ((rotation & 1) && ((_lcd_capable & MV_AXIS) == 0))
@@ -530,21 +526,31 @@ void TFTScreen::pushColors(const uint8_t * block, int16_t n, bool first)
 
 void TFTScreen::vertScroll(int16_t top, int16_t scrollines, int16_t offset)
 {
-#if defined(OFFSET_9327)
-	if (_lcd_ID == 0x9327) {
-		if (rotation == 2 || rotation == 3) top += OFFSET_9327;
+	if (_lcd_ID == 0x9327) 
+	{
+		if (rotation == 2 || rotation == 3) 
+			top += 32;
 	}
-#endif
+
 	int16_t bfa = HEIGHT - top - scrollines;  // bottom fixed area
 	int16_t vsp;
 	int16_t sea = top;
-	if (_lcd_ID == 0x9327) bfa += 32;
-	if (offset <= -scrollines || offset >= scrollines) offset = 0; //valid scroll
+
+	if (_lcd_ID == 0x9327) 
+		bfa += 32;
+
+	if (offset <= -scrollines || offset >= scrollines) 
+		offset = 0; //valid scroll
+
 	vsp = top + offset; // vertical start position
+	
 	if (offset < 0)
 		vsp += scrollines;          //keep in unsigned range
+
 	sea = top + scrollines - 1;
-	if (_lcd_capable & MIPI_DCS_REV1) {
+
+	if (_lcd_capable & MIPI_DCS_REV1) 
+	{
 		uint8_t d[6];           // for multi-byte parameters
 /*
 		if (_lcd_ID == 0x9327) {        //panel is wired for 240x432
@@ -570,49 +576,43 @@ void TFTScreen::vertScroll(int16_t top, int16_t scrollines, int16_t offset)
 		d[0] = vsp >> 8;        //VSP
 		d[1] = vsp;
 		WriteCmdParamN(is8347 ? 0x14 : 0x37, 2, d);
-		if (is8347) {
+
+		if (is8347) 
+		{
 			d[0] = (offset != 0) ? (_lcd_ID == 0x8347 ? 0x02 : 0x08) : 0;
 			WriteCmdParamN(_lcd_ID == 0x8347 ? 0x18 : 0x01, 1, d);  //HX8347-D
 		}
-		else if (offset == 0 && (_lcd_capable & MIPI_DCS_REV1)) {
+		else if (offset == 0 && (_lcd_capable & MIPI_DCS_REV1)) 		
 			WriteCmdParamN(0x13, 0, NULL);    //NORMAL i.e. disable scroll
-		}
+		
 		return;
 	}
 	// cope with 9320 style variants:
-	switch (_lcd_ID) {
-	case 0x7783:
-		WriteCmdData(0x61, _lcd_rev);   //!NDL, !VLE, REV
-		WriteCmdData(0x6A, vsp);        //VL#
-		break;
-#ifdef SUPPORT_0139
-	case 0x0139:
-		WriteCmdData(0x41, sea);        //SEA
-		WriteCmdData(0x42, top);        //SSA
-		WriteCmdData(0x43, vsp - top);  //SST
-		break;
-#endif
-	case 0x0154:
-		WriteCmdData(0x31, sea);        //SEA
-		WriteCmdData(0x32, top);        //SSA
-		WriteCmdData(0x33, vsp - top);  //SST
-		break;
-#ifdef SUPPORT_1289
-	case 0x1289:
-		WriteCmdData(0x41, vsp);        //VL#
-		break;
-#endif
-	case 0x7793:
-	case 0x9326:
-	case 0xB509:
-		WriteCmdData(0x401, (1 << 1) | _lcd_rev);       //VLE, REV 
-		WriteCmdData(0x404, vsp);       //VL# 
-		break;
-	default:
-		// 0x6809, 0x9320, 0x9325, 0x9335, 0xB505 can only scroll whole screen
-		WriteCmdData(0x61, (1 << 1) | _lcd_rev);        //!NDL, VLE, REV
-		WriteCmdData(0x6A, vsp);        //VL#
-		break;
+	switch (_lcd_ID) 
+	{
+		case 0x7783:
+				WriteCmdData(0x61, _lcd_rev);   //!NDL, !VLE, REV
+				WriteCmdData(0x6A, vsp);        //VL#
+			break;
+
+		case 0x0154:
+				WriteCmdData(0x31, sea);        //SEA
+				WriteCmdData(0x32, top);        //SSA
+				WriteCmdData(0x33, vsp - top);  //SST
+			break;
+
+		case 0x7793:
+		case 0x9326:
+		case 0xB509:
+				WriteCmdData(0x401, (1 << 1) | _lcd_rev);       //VLE, REV 
+				WriteCmdData(0x404, vsp);       //VL# 
+			break;
+
+		default:
+				// 0x6809, 0x9320, 0x9325, 0x9335, 0xB505 can only scroll whole screen
+				WriteCmdData(0x61, (1 << 1) | _lcd_rev);        //!NDL, VLE, REV
+				WriteCmdData(0x6A, vsp);        //VL#
+			break;
 	}
 }
 
@@ -647,7 +647,7 @@ static void init_table(const void *table, int16_t size)
 		}
 		size -= len + 2;
 	}
-	}
+}
 
 void TFTScreen::begin()
 {

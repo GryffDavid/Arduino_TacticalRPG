@@ -427,11 +427,9 @@ void Game::Init()
 
 	CurrentGameState = World;
 
-	pinMode(53, OUTPUT);
-	digitalWrite(53, HIGH);
-
-	tft.begin(tft.readID());
-	tft.setRotation(1);
+	
+	tft.begin();
+	tft.setRotation(3);
 	tft.fillScreen(BLACK);
 	
 	//Start the SD card
@@ -1038,9 +1036,9 @@ void Game::MovePlayer()
 
 void Game::DrawScreen()
 {
-	tft.setFont(&Anims1);
+	//tft.setFont(&Anims1);
 	tft.setCursor(0, 16);
-
+	
 	for (uint16_t y = 0; y < yLength-1; y++)
 	{
 		for (uint16_t x = 0; x < xLength; x++)
@@ -1054,11 +1052,11 @@ void Game::DrawScreen()
 			switch (newTile.style)
 			{
 				default:
-					newTile.color = GREEN;
+					newTile.color = GREEN;					
 					break;
 
-				case 'b':
 				case 'f':
+				case 'b':
 					newTile.color = YELLOW;
 					break;
 
@@ -1074,13 +1072,12 @@ void Game::DrawScreen()
 					newTile.color = DARKGREEN;
 					break;
 
-				case 'h':
-					newTile.color = DARKGREY;
+				case 'm':
+					newTile.color = WHITE;
 					break;
 			}
 
 			tScreen[y][x] = newTile;
-
 			tft.setTextColor(newTile.color);
 			tft.print(newTile.style);
 		}
@@ -1178,6 +1175,14 @@ void Game::LoadPlayer()
 
 void Game::LoadChunk(uint16_t xStart, uint16_t yStart)
 {
+	//Serial.println("Loading chunk...");
+
+	/*tft.fillRect(0, 0, 16 * (xLength - 1), 16 * (yLength - 1), BLACK);*/
+	//tft.setCursor(0, 16);
+	//tft.setFont();
+	//tft.setTextColor(WHITE);
+	//tft.print("Loading chunk...");
+
 	xStart *= xLength - 1;
 	yStart *= yLength - 1;
 
@@ -1198,7 +1203,6 @@ void Game::LoadChunk(uint16_t xStart, uint16_t yStart)
 				uint16_t pos = ((151 * y + y)) + xStart;
 				myFile.seek(pos);
 				myFile.readBytes(buf, sizeof(buf));
-
 				sScreen += buf;
 				sScreen += '\n';
 			}
@@ -1207,13 +1211,18 @@ void Game::LoadChunk(uint16_t xStart, uint16_t yStart)
 		myFile.close();
 	}
 	else
-	{
+	{		
+		tft.fillRect(0, 0, 16 * (xLength - 1), 16 * (yLength - 1), BLACK); 
+		tft.setFont();
+		tft.setTextColor(WHITE);
 		tft.println("error opening LVL.txt");
 	}
 
 	LoadEnemies(xStart, yStart);
 
+	//tft.fillRect(0, 8, 100, 16, BLACK);
 	tft.fillRect(0, 0, 16 * (xLength - 1), 16 * (yLength - 1), BLACK);
+
 	DrawScreen();
 	DrawEnemies();
 
@@ -1226,6 +1235,8 @@ void Game::LoadEnemies(uint16_t xStart, uint16_t yStart)
 {
 	//xStart *= xLength - 1;
 	//yStart *= yLength - 1;
+	//Serial.println("Loading enemies...");
+
 	for (byte i = 0; i < 10; i++)
 	{
 		enemies[i].Active = false;
@@ -1238,6 +1249,8 @@ void Game::LoadEnemies(uint16_t xStart, uint16_t yStart)
 	{
 		if (myFile.available())
 		{
+			//Serial.println("ENS exists. Opening...");
+
 			for (byte y = yStart; y < yStart + yLength - 1; y++)
 			{
 				char buf[xLength - 1];
