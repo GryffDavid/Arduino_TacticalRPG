@@ -8,6 +8,7 @@
 #include <SD.h>
 #include <Adafruit_GFX.h>
 #include <Fonts/Anims1.h>
+#include <LinkedList.h>
 
 #define MINPRESSURE 20
 #define MAXPRESSURE 1000
@@ -48,6 +49,15 @@
 enum GameState { World, Combat };
 enum PlayerState { Normal, TargetMode };
 
+enum GunType { Small, Big, Energy };
+
+struct SearchNode
+{
+	uint16_t x, y;
+	uint16_t DistToGoal;
+	uint16_t DistTraveled;
+};
+
 class cBtn
 {
 	public:
@@ -80,6 +90,23 @@ class Gun
 	public:
 		byte ReloadAP, Range, MaxDamage, MinDamage, APCost, Magazine;
 		char Style; //The character to represent this weapon in menus etc
+		GunType GunType;
+};
+
+class Pathfinder
+{
+	public:
+		Pathfinder();
+		LinkedList<SearchNode*> OpenList = LinkedList<SearchNode*>();
+		LinkedList<SearchNode*> ClosedList = LinkedList<SearchNode*>();
+		void Init();
+		void GetGame(Game *game) { _game = game; };
+		bool FindPath = true; //Whether a path needs to be found still
+		void DoSearchStep();
+		void SelectNodeToVisit();
+		
+	private:
+		Game * _game;
 };
 
 class Selector
@@ -141,15 +168,20 @@ class Enemy
 		void EndTurn();
 		void StartTurn();		
 		void Undraw();
-		byte x, y;
-		byte STR, DEX;
-		int16_t MaxHP, CurHP;
-		byte MaxAP, CurAP;
+		bool Active, Targeted;
+		bool MyTurn = false;
 		char Style;
 		String Name;
 		uint16_t Color;
-		bool Active, Targeted;
-		bool MyTurn = false;
+
+		byte x, y;
+		byte XPValue, ArmorClass, Sequence, CritChance;
+		byte MeleeD, MeleeMin, MeleeMax;
+		int16_t MaxHP, CurHP;
+		byte MaxAP, CurAP;		
+		
+		
+		
 
 	private:
 		Game * _game;
@@ -161,9 +193,10 @@ class Player
 {
 	public:
 		Player(void);
-
+		void Init();
 		void EndTurn();
 		void StartTurn();
+		bool CanHit(); //Calculate whether the attack hits or not
 		void SelectEnemy(Enemy *enemy) { _selectedEnemy = enemy; };
 		void GetGame(Game *game) { _game = game; };
 
@@ -171,29 +204,39 @@ class Player
 
 		Gun CurrentGun;
 		MeleeWeapon CurrentMelee;
+		Enemy * _selectedEnemy;
+
+		bool HasTarget;
+		bool MyTurn = false;
+
+		uint16_t money;
+		byte Level;
 
 		//Position
 		byte x, prevX;
 		byte y, prevY;
 
-		//Strength, Perception, Endurance, Charisma, Intelligence, Agility, Luck
+		//Strength, Perception, Endurance, Charisma, Intelligence, Agility, Luck		
 		byte STR, PER, END, CHA, INT, AGI, LUC;
-
-		bool HasTarget;
-
-		//http://fallout.wikia.com/wiki/Fallout_2_derived_statistics
-		byte ArmorClass, CritChance, DResist, HealRate, MeleeD, PerkRate, RadResist, Sequence, SkillRate;
-
-		uint16_t money;
-
+				
 		byte MaxHP, CurHP;
-		byte MaxAP, CurAP; //Action points
-		byte Level;
-
-		bool MyTurn = false;
-		Enemy * _selectedEnemy;
-	private:
+		byte MaxAP, CurAP;
 		
+		//http://fallout.wikia.com/wiki/Fallout_2_derived_statistics
+		byte ArmorClass, CarryWeight, CritChance, DResist, HealRate, 
+			 MeleeD, PerkRate, PResist, RadResist, Sequence, SkillRate;
+
+		//Combat Skills
+		byte SmallGuns, BigGuns, EnergyWeapons, 
+			 Unarmed, MeleeWeapons, Throwing;
+
+		//Active Skills
+		byte FirstAid, Doctor, Sneak, LockPick, Steal, Traps, Science, Repair;
+
+		//Passive Skills
+		byte Speech, Barter, Gambling, Outdoorsman;
+
+	private:		
 		Game * _game;
 };
 
@@ -250,6 +293,8 @@ class Game
 		void DrawEnemies();
 		void CheckTouchScreen();
 
+		Pathfinder pFinder;
+
 		unsigned long Time;
 		unsigned long ElaspedTime;
 
@@ -285,7 +330,6 @@ class Game
 		cBtn bButton = cBtn(36);		
 	private:
 };
-
 
 
 #endif

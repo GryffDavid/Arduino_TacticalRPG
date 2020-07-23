@@ -288,9 +288,73 @@ Player::Player(void)
 	y = 1;
 	prevX = 1;
 	prevY = 1;
+}
 
-	CurHP = 10;
-	MaxHP = 10;
+void Player::Init()
+{
+	//SPECIAL stats
+	STR = 5;
+	PER = 5;
+	END = 5;
+	CHA = 5;
+	INT = 5;
+	AGI = 5;
+	LUC = 5;
+
+	//DERIVED stats
+	MaxAP = (int)(5 / 2) + 5;
+	CurAP = MaxAP;
+
+	MaxHP = 15 + (2 * END) + STR;
+	CurHP = MaxHP;
+
+	ArmorClass = AGI;
+	CarryWeight = 25 + (STR * 25);
+	CritChance = LUC;
+	DResist = 0;
+	HealRate = max(END / 3, 1);
+	MeleeD = max(STR - 5, 1);
+	PerkRate = 3;
+	PResist = (END * 5);
+	RadResist = (END * 2);
+	Sequence = PER * 2;
+	SkillRate = (INT * 2) + 5;
+	
+
+	//COMBAT SKILLS
+	SmallGuns = 5 + (4 * AGI);
+	BigGuns = 2 * AGI;
+	EnergyWeapons = 2 * AGI;
+	Unarmed = 40 + (STR / 2) + (AGI / 2);
+	MeleeWeapons = 55 + (STR / 2) + (AGI / 2);
+	Throwing = 4 * AGI;
+
+	//ACTIVE SKILLS
+	FirstAid = 30 + (PER / 2) + (INT / 2);
+	Doctor = 15 + (PER / 2) + (INT / 2);
+	Sneak = 25 + AGI;
+	LockPick = 20 + (PER / 2) + (AGI / 2);
+	Steal = 20 + AGI;
+	Traps = 20 + (PER / 2) + (AGI / 2);
+	Science = 25 + (2 * INT);
+	Repair = 20 + INT;
+
+	//PASSIVE SKILLS
+	Speech = 25 + (2 * CHA);
+	Barter = 20 + (2 * CHA);
+	Gambling = 5 * LUC;
+	Outdoorsman = (2 * END) + (2 * INT);
+
+
+
+	Gun tmpGun;
+	tmpGun.GunType = Small;
+	tmpGun.APCost = 5;
+	tmpGun.MaxDamage = 15;
+	tmpGun.MinDamage = 10;
+
+	CurrentGun = tmpGun;
+	PlayerState = Normal;
 }
 
 void Player::EndTurn()
@@ -309,6 +373,58 @@ void Player::StartTurn()
 	_game->DrawUI();
 }
 
+bool Player::CanHit()
+{
+	byte Required = random(0, 100);
+	Serial.println("Required " + (String)Required);
+	byte BTH;
+
+	switch (CurrentGun.GunType)
+	{
+		case Small:		
+			BTH += SmallGuns;		
+			break;
+
+		case Big:
+			BTH += BigGuns;
+			break;
+
+		case Energy:
+			BTH += EnergyWeapons;
+			break;
+	}
+
+	BTH -= 30;
+
+	double deltaX = ((x * 16) + 8) - ((_selectedEnemy->x * 16) + 8); //X Change
+	double deltaY = ((y * 16) + 8) - ((_selectedEnemy->y * 16) + 8); //Y Change
+	double d = sqrt((deltaX * deltaX) + (deltaY * deltaY));
+
+	BTH += ((PER - 2) * 16);
+	BTH -= (d / 16) * 4;
+	BTH -= _selectedEnemy->ArmorClass;
+
+	Serial.println("BTH: " + (String)BTH);
+	
+	if (BTH > Required)
+		return true;
+	else
+		return false;
+}
+
+
+Pathfinder::Pathfinder()
+{
+}
+
+void Pathfinder::Init()
+{
+	SearchNode *node1 = new SearchNode();
+	node1->x = 10;
+	node1->y = 10;
+	node1->DistToGoal = 5;
+	OpenList.add(node1);	
+}
 
 
 Game::Game()
@@ -336,12 +452,20 @@ void Game::Init()
 
 	//CopyFile("OENS.txt", "ENS.txt");
 	LoadPlayer();
+	player.Init();	
 	DrawUI();
 	
 	selector.GetGame(this);
 	explosion.GetGame(this);
 	activityFeed.GetGame(this);
 	player.GetGame(this);
+
+	pFinder.Init();
+	
+	for (int i = 0; i < pFinder.OpenList.size(); i++)
+	{
+		Serial.println(pFinder.OpenList.get(i)->x);
+	}
 
 
 	//Could almost certainly do this better by making the _game variable static across all instances of enemy
@@ -570,24 +694,31 @@ void Game::Input()
 							//Calculate which blocks it intersected along the path
 							//Redraw those blocks when necessary?
 							//Also solid blocks need to stop shots
-
+							//https://fallout.gamepedia.com/Fallout_and_Fallout_2_combat
 							uint16_t ND, RD;
 
-							RD = random(player.CurrentGun.MinDamage, player.CurrentGun.MaxDamage);
-							ND = RD;
-
-							player._selectedEnemy->CurHP -= ND;
-							activityFeed.Update("Fired shot. Hit " + player._selectedEnemy->Name + " for " + ND);
-
-							if (player._selectedEnemy->CurHP <= 0)
+							if (player.CanHit() == true)
 							{
-								player._selectedEnemy->Active = false;
-								player._selectedEnemy->Undraw();
-								activityFeed.Update(player._selectedEnemy->Name + " was killed");
+								RD = random(player.CurrentGun.MinDamage, player.CurrentGun.MaxDamage);
+								ND = RD;
+
+								player._selectedEnemy->CurHP -= ND;
+								activityFeed.Update("Fired shot. Hit " + player._selectedEnemy->Name + " for " + ND);
+
+								if (player._selectedEnemy->CurHP <= 0)
+								{
+									player._selectedEnemy->Active = false;
+									player._selectedEnemy->Undraw();
+									activityFeed.Update(player._selectedEnemy->Name + " was killed");
+								}
+								else
+								{
+									activityFeed.Update(player._selectedEnemy->Name + " has " + player._selectedEnemy->CurHP + " remaining");
+								}
 							}
 							else
 							{
-								activityFeed.Update(player._selectedEnemy->Name + " has " + player._selectedEnemy->CurHP + " remaining");
+								activityFeed.Update("Fired shot. Missed");
 							}
 
 							//If enemy dies, select next enemy? Or deselect completely
@@ -1058,25 +1189,7 @@ void Game::UpdateEnemies()
 
 void Game::LoadPlayer()
 {
-	player.STR = 5;
-	player.PER = 5;
-	player.END = 5;
-	player.CHA = 5;
-	player.INT = 5;
-	player.AGI = 5;
-	player.LUC = 5;
 
-	player.ArmorClass = player.AGI;
-
-	player.MaxAP = (int)(5 / 2) + 5;
-	player.CurAP = player.MaxAP;
-	
-	Gun tmpGun;
-	tmpGun.APCost = 5;
-	tmpGun.MaxDamage = 15;
-	tmpGun.MinDamage = 10;
-	player.CurrentGun = tmpGun;
-	player.PlayerState = Normal;
 }
 
 void Game::LoadChunk(uint16_t xStart, uint16_t yStart)
@@ -1085,6 +1198,8 @@ void Game::LoadChunk(uint16_t xStart, uint16_t yStart)
 	yStart *= yLength - 1;
 
 	sScreen = "";
+
+	player.HasTarget = false;
 
 	//Load Tiles
 	myFile = SD.open("LVL.txt");
